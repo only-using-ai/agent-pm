@@ -1,0 +1,158 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createWorkItemCreatedHandler } from '../work-item-created-handler.js'
+import type { WorkItemCreatedPayload } from '../../hooks.js'
+import type { AgentRow } from '../types.js'
+
+// Mock deepagents so no real API is called
+vi.mock('deepagents', () => ({
+  createDeepAgent: vi.fn(() => ({
+    stream: vi.fn().mockImplementation(async function* () {
+      yield { content: 'Hello from agent.' }
+    }),
+    invoke: vi.fn(),
+  })),
+}))
+
+describe('work-item-created-handler (LangChain)', () => {
+  const mockPayload: WorkItemCreatedPayload = {
+    id: 'wi-1',
+    project_id: 'p-1',
+    title: 'New task',
+    description: null,
+    assigned_to: 'agent-1',
+    priority: 'Medium',
+    depends_on: null,
+    status: 'todo',
+    archived_at: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  const mockAgent: AgentRow = {
+    id: 'agent-1',
+    name: 'Test Agent',
+    team_id: 'team-1',
+    instructions: 'Help the user.',
+    ai_provider: 'ollama',
+    model: 'llama3',
+    created_at: new Date().toISOString(),
+  }
+
+  let mockGetPool: () => { query: ReturnType<typeof vi.fn> }
+  let mockGetAgentById: ReturnType<typeof vi.fn>
+  let mockGetPromptByKey: ReturnType<typeof vi.fn>
+  let mockBuildContext: ReturnType<typeof vi.fn>
+  let mockGetInitialMessages: ReturnType<typeof vi.fn>
+  let mockUpdateWorkItem: ReturnType<typeof vi.fn>
+  let mockAddWorkItemComment: ReturnType<typeof vi.fn>
+  let mockListAgents: ReturnType<typeof vi.fn>
+  let mockCreateWorkItem: ReturnType<typeof vi.fn>
+  let mockEmitWorkItemCreated: ReturnType<typeof vi.fn>
+  let mockBroadcaster: { broadcastToAgent: ReturnType<typeof vi.fn> }
+
+  beforeEach(() => {
+    mockGetPool = vi.fn(() => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }))
+    mockGetAgentById = vi.fn().mockResolvedValue(mockAgent)
+    mockGetPromptByKey = vi.fn().mockResolvedValue(null)
+    mockBuildContext = vi.fn().mockReturnValue({ userMessage: 'Do something', context: {}, variables: {} })
+    mockGetInitialMessages = vi.fn().mockReturnValue([
+      { role: 'system', content: '' },
+      { role: 'user', content: '' },
+    ])
+    mockUpdateWorkItem = vi.fn().mockResolvedValue(null)
+    mockAddWorkItemComment = vi.fn().mockResolvedValue(null)
+    mockListAgents = vi.fn().mockResolvedValue([])
+    mockCreateWorkItem = vi.fn().mockResolvedValue({ id: 'wi-new', project_id: 'p-1', title: 'New', assigned_to: null })
+    mockEmitWorkItemCreated = vi.fn()
+    mockBroadcaster = { broadcastToAgent: vi.fn() }
+  })
+
+  it('runs LangChain agent stream and broadcasts chunks', async () => {
+    const { runAgentStream } = await import('../../agent/index.js')
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getPromptByKey: mockGetPromptByKey,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+    })
+    await handler(mockPayload)
+
+    expect(mockGetAgentById).toHaveBeenCalledWith(expect.anything(), 'agent-1')
+    expect(mockGetPromptByKey).toHaveBeenCalledWith(expect.anything(), 'agent_system_prompt')
+    expect(mockBuildContext).toHaveBeenCalledWith(mockAgent, mockPayload, { template: null })
+    expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_start', {
+      work_item_id: 'wi-1',
+      title: 'New task',
+    })
+    expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_chunk', {
+      chunk: 'Hello from agent.',
+      type: 'content',
+    })
+    expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_end', {})
+  })
+
+  it('broadcasts thinking chunks with type "thinking" so client can stream reasoning', async () => {
+    const { createDeepAgent } = await import('deepagents')
+    vi.mocked(createDeepAgent).mockReturnValueOnce({
+      stream: vi.fn().mockImplementation(async function* () {
+        yield { additional_kwargs: { thinking: 'Let me think...' } }
+        yield { additional_kwargs: { thinking: ' step by step.' } }
+        yield { content: 'Final answer.' }
+      }),
+      invoke: vi.fn(),
+    } as unknown as ReturnType<typeof createDeepAgent>)
+    const { runAgentStream } = await import('../../agent/index.js')
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getPromptByKey: mockGetPromptByKey,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+    })
+    await handler(mockPayload)
+
+    const streamChunkCalls = (mockBroadcaster.broadcastToAgent as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c: [string, string, unknown]) => c[1] === 'stream_chunk'
+    )
+    const thinkingCalls = streamChunkCalls.filter((c: [string, string, { type?: string }]) => c[2]?.type === 'thinking')
+    expect(thinkingCalls.length).toBeGreaterThanOrEqual(1)
+    const thinkingChunks = thinkingCalls.map((c: [string, string, { chunk?: string }]) => c[2]?.chunk ?? '')
+    expect(thinkingChunks.join('')).toContain('Let me think')
+  })
+
+  it('returns early when payload has no assigned_to', async () => {
+    const { runAgentStream } = await import('../../agent/index.js')
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getPromptByKey: mockGetPromptByKey,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+    })
+    await handler({ ...mockPayload, assigned_to: null })
+    expect(mockGetAgentById).not.toHaveBeenCalled()
+    expect(mockBroadcaster.broadcastToAgent).not.toHaveBeenCalled()
+  })
+})

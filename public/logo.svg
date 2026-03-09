@@ -1,0 +1,42 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle (subtle depth) -->
+  <circle cx="200" cy="200" r="190" fill="#0f172a"/>
+  
+  <!-- Main orbiting ring / connection symbol -->
+  <circle 
+    cx="200" 
+    cy="200" 
+    r="148" 
+    fill="none" 
+    stroke="#60a5fa" 
+    stroke-width="16" 
+    stroke-dasharray="12 28" 
+    opacity="0.9"/>
+  
+  <!-- Central agent node / hub -->
+  <circle cx="200" cy="200" r="68" fill="#1e293b"/>
+  <circle cx="200" cy="200" r="52" fill="#3b82f6"/>
+  
+  <!-- Inner glowing core -->
+  <circle cx="200" cy="200" r="34" fill="white" opacity="0.15"/>
+  <circle cx="200" cy="200" r="22" fill="#93c5fd"/>
+  
+  <!-- Stylized "A" integrated into the node -->
+  <path 
+    d="M 200 148 L 168 252 L 184 252 L 194 220 L 206 220 L 216 252 L 232 252 Z"
+    fill="#0f172a"
+    stroke="#60a5fa"
+    stroke-width="5"
+    stroke-linejoin="round"/>
+  
+  <!-- Small orbiting dots (tasks / agents) -->
+  <circle cx="200" cy="68"  r="12" fill="#93c5fd"/>
+  <circle cx="282" cy="118" r="12" fill="#60a5fa"/>
+  <circle cx="282" cy="282" r="12" fill="#93c5fd"/>
+  <circle cx="200" cy="332" r="12" fill="#60a5fa"/>
+  <circle cx="118" cy="282" r="12" fill="#93c5fd"/>
+  <circle cx="118" cy="118" r="12" fill="#60a5fa"/>
+  
+  <!-- Very subtle outer glow -->
+  <circle cx="200" cy="200" r="178" fill="none" stroke="#3b82f6" stroke-width="24" opacity="0.12"/>
+</svg>
