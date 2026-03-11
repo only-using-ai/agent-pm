@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAgents } from '@/contexts/agents-context'
 import { useTeams } from '@/contexts/teams-context'
+import { useCreateAgentMutation } from '@/hooks/queries'
 import { ArrowLeft } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,13 +29,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { getApiBase } from '@/lib/api'
 import { useProviderModels } from '@/hooks/use-provider-models'
 import { AI_PROVIDERS } from '@/lib/ai-providers'
 
 export function AddAgentPage() {
   const navigate = useNavigate()
-  const { refetch: refetchAgents } = useAgents()
+  const createAgent = useCreateAgentMutation()
   const { teams, createTeam } = useTeams()
   const [name, setName] = useState('')
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
@@ -43,7 +42,6 @@ export function AddAgentPage() {
   const [showNewTeamInput, setShowNewTeamInput] = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
   const [creatingTeam, setCreatingTeam] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [aiProvider, setAiProvider] = useState<string>('ollama')
   const [model, setModel] = useState<string | null>(null)
@@ -75,29 +73,17 @@ export function AddAgentPage() {
       return
     }
     setSubmitError(null)
-    setSubmitting(true)
     try {
-      const res = await fetch(`${getApiBase()}/api/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          team_id: selectedTeamId,
-          instructions: instructions.trim() || null,
-          ai_provider: aiProvider,
-          model: model || null,
-        }),
+      await createAgent.mutateAsync({
+        name: name.trim(),
+        team_id: selectedTeamId,
+        instructions: instructions.trim() || null,
+        ai_provider: aiProvider,
+        model: model || null,
       })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(data.error || `Request failed (${res.status})`)
-      }
-      await refetchAgents()
       navigate('/')
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to create agent')
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -272,8 +258,8 @@ export function AddAgentPage() {
             <p className="text-sm text-destructive">{submitError}</p>
           )}
           <CardFooter className="gap-2">
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Creating…' : 'Create Agent'}
+            <Button type="submit" disabled={createAgent.isPending}>
+              {createAgent.isPending ? 'Creating…' : 'Create Agent'}
             </Button>
             <Link to="/" className={buttonVariants({ variant: 'outline' })}>
               Cancel

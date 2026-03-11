@@ -41,6 +41,7 @@ describe('project-files.service', () => {
         .mockResolvedValueOnce([
           { name: 'file.txt', isDirectory: () => false, isFile: () => true },
           { name: 'sub', isDirectory: () => true, isFile: () => false },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ] as any)
         .mockResolvedValueOnce([])
       const result = await listDirectoryTree('/root')

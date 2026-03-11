@@ -35,13 +35,15 @@ import { Streamdown } from 'streamdown'
 import { useAgentStream } from '@/contexts/agent-stream-context'
 import { useTeams } from '@/contexts/teams-context'
 import { useProviderModels } from '@/hooks/use-provider-models'
-import { archiveAgent, getApiBase } from '@/lib/api'
+import { useArchiveAgentMutation } from '@/hooks/queries'
+import { getApiBase } from '@/lib/api'
 import { AI_PROVIDERS } from '@/lib/ai-providers'
 
 export function AgentPage() {
   const { agentId } = useParams<{ agentId: string }>()
   const navigate = useNavigate()
   const { agents, refetch: refetchAgents } = useAgents()
+  const archiveAgent = useArchiveAgentMutation()
   const { subscribe: subscribeToStream, streamContent, streamThinking, clearStream, streamingAgentIds } = useAgentStream()
   const { teams, createTeam } = useTeams()
   const agent = agentId ? agents.find((a) => a.id === agentId) : null
@@ -168,8 +170,7 @@ export function AgentPage() {
 
   const handleArchiveConfirm = async () => {
     if (!agentId) return
-    await archiveAgent(agentId)
-    await refetchAgents()
+    await archiveAgent.mutateAsync(agentId)
     navigate('/')
   }
 

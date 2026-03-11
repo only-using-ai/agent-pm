@@ -7,7 +7,7 @@ import {
   updateProject,
   archiveProject,
 } from '../projects.service.js'
-import type { ProjectRow, CreateProjectInput, UpdateProjectInput } from '../types.js'
+import type { ProjectRow, CreateProjectInput } from '../types.js'
 
 describe('projects.service', () => {
   let mockQuery: ReturnType<typeof vi.fn>

@@ -3,6 +3,8 @@
  * Uses ANTHROPIC_API_KEY. See https://docs.anthropic.com/en/api/models
  */
 
+import { getAnthropicApiKey } from '../config.js'
+
 const MODELS_URL = 'https://api.anthropic.com/v1/models'
 const ANTHROPIC_VERSION = '2023-06-01'
 
@@ -13,7 +15,7 @@ export type AnthropicModelsResult =
 export async function fetchAnthropicModels(options?: {
   apiKey?: string
 }): Promise<AnthropicModelsResult> {
-  const apiKey = options?.apiKey ?? process.env.ANTHROPIC_API_KEY
+  const apiKey = options?.apiKey ?? getAnthropicApiKey()
 
   if (!apiKey) {
     return { ok: false, error: 'Anthropic API key required. Set ANTHROPIC_API_KEY.' }

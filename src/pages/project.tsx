@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ChevronDown, GripVertical, Plus, Settings2, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -592,7 +592,7 @@ export function ProjectPage() {
         return next
       }, { replace: true })
     }
-  }, [])
+  }, [searchParams, setSearchParams])
 
   const submitEditWorkItem = useCallback(async () => {
     if (!projectId || !editingWorkItemId || !editForm.title.trim()) return
@@ -642,11 +642,15 @@ export function ProjectPage() {
     }
   }, [projectId, editingWorkItemId, newComment, mentionedAgentIds])
 
-  const filteredAgentsForMention = mentionDropdown.show
-    ? agents.filter((a) =>
-        a.name.toLowerCase().includes(mentionDropdown.filter.toLowerCase().trim())
-      )
-    : []
+  const filteredAgentsForMention = useMemo(
+    () =>
+      mentionDropdown.show
+        ? agents.filter((a) =>
+            a.name.toLowerCase().includes(mentionDropdown.filter.toLowerCase().trim())
+          )
+        : [],
+    [mentionDropdown.show, mentionDropdown.filter, agents]
+  )
 
   const handleCommentChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {

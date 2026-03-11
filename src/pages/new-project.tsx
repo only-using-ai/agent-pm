@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createProject } from '@/lib/api'
-import { useProjects } from '@/contexts/projects-context'
+import { useCreateProjectMutation } from '@/hooks/queries'
 import { ArrowLeft } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,31 +31,26 @@ const PRIORITY_OPTIONS = [
 
 export function NewProjectPage() {
   const navigate = useNavigate()
-  const { refetch } = useProjects()
+  const createProject = useCreateProjectMutation()
   const [name, setName] = useState('')
   const [priority, setPriority] = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [path, setPath] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setSubmitting(true)
     try {
-      const project = await createProject({
+      const project = await createProject.mutateAsync({
         name,
         priority,
         description,
         path: path.trim() || null,
       })
-      await refetch()
       navigate(`/projects/${project.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project')
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -133,8 +127,8 @@ export function NewProjectPage() {
             </div>
           </CardContent>
           <CardFooter className="gap-2">
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Creating…' : 'Create Project'}
+            <Button type="submit" disabled={createProject.isPending}>
+              {createProject.isPending ? 'Creating…' : 'Create Project'}
             </Button>
             <Link to="/" className={buttonVariants({ variant: 'outline' })}>
               Cancel

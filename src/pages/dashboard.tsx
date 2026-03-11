@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  listAllWorkItems,
-  listInbox,
-  approveInboxItem,
-  rejectInboxItem,
-  type WorkItemWithProject,
-} from '@/lib/api'
+import { listAllWorkItems, type WorkItemWithProject } from '@/lib/api'
 import { useAgents } from '@/contexts/agents-context'
-import { useInbox } from '@/contexts/inbox-context'
 import { useAgentStream } from '@/contexts/agent-stream-context'
 import { useProjects } from '@/contexts/projects-context'
+import {
+  useInboxQuery,
+  useApproveInboxItemMutation,
+  useRejectInboxItemMutation,
+} from '@/hooks/queries'
 import {
   Card,
   CardContent,
@@ -36,21 +34,19 @@ import { cn } from '@/lib/utils'
 export function DashboardPage() {
   const navigate = useNavigate()
   const { agents, loading: agentsLoading } = useAgents()
-  const { refetch: refetchInbox } = useInbox()
+  const { data: inboxItems = [], isLoading: inboxLoading } = useInboxQuery()
+  const approveInbox = useApproveInboxItemMutation()
+  const rejectInbox = useRejectInboxItemMutation()
   const { streamingAgentIds } = useAgentStream()
   const { projects, loading: projectsLoading } = useProjects()
   const [workItems, setWorkItems] = useState<WorkItemWithProject[]>([])
   const [workItemsLoading, setWorkItemsLoading] = useState(true)
-  const [inboxItems, setInboxItems] = useState<Awaited<ReturnType<typeof listInbox>>>([])
-  const [inboxLoading, setInboxLoading] = useState(true)
   const [approvingId, setApprovingId] = useState<string | null>(null)
 
   const handleApprove = async (id: string) => {
     setApprovingId(id)
     try {
-      await approveInboxItem(id)
-      setInboxItems((prev) => prev.filter((i) => i.id !== id))
-      await refetchInbox()
+      await approveInbox.mutateAsync(id)
     } finally {
       setApprovingId(null)
     }
@@ -59,9 +55,7 @@ export function DashboardPage() {
   const handleReject = async (id: string) => {
     setApprovingId(id)
     try {
-      await rejectInboxItem(id)
-      setInboxItems((prev) => prev.filter((i) => i.id !== id))
-      await refetchInbox()
+      await rejectInbox.mutateAsync(id)
     } finally {
       setApprovingId(null)
     }
@@ -79,24 +73,6 @@ export function DashboardPage() {
       })
       .finally(() => {
         if (!cancelled) setWorkItemsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    setInboxLoading(true)
-    listInbox()
-      .then((data) => {
-        if (!cancelled) setInboxItems(data)
-      })
-      .catch(() => {
-        if (!cancelled) setInboxItems([])
-      })
-      .finally(() => {
-        if (!cancelled) setInboxLoading(false)
       })
     return () => {
       cancelled = true

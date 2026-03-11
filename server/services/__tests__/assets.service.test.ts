@@ -12,7 +12,7 @@ import {
   setWorkItemAssets,
   getAssetsForWorkItem,
 } from '../assets.service.js'
-import type { AssetRow, AssetTreeNode, CreateAssetInput, UpdateAssetInput } from '../types.js'
+import type { AssetRow } from '../types.js'
 
 describe('assets.service', () => {
   let mockQuery: ReturnType<typeof vi.fn>

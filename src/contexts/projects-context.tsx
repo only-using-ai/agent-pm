@@ -1,13 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- exports ProjectsProvider and useProjects */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react'
-import { listProjects, type Project } from '@/lib/api'
+import { createContext, useContext, useMemo } from 'react'
+import { useProjectsQuery } from '@/hooks/queries'
+import type { Project } from '@/lib/api'
 
 type ProjectsContextValue = {
   projects: Project[]
@@ -19,31 +13,20 @@ type ProjectsContextValue = {
 const ProjectsContext = createContext<ProjectsContextValue | null>(null)
 
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const refetch = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await listProjects()
-      setProjects(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load projects')
-      setProjects([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    refetch()
-  }, [refetch])
+  const { data, isLoading, error, refetch } = useProjectsQuery()
+  const projects = useMemo(() => data ?? [], [data])
+  const errorMessage = error instanceof Error ? error.message : null
 
   const value = useMemo<ProjectsContextValue>(
-    () => ({ projects, loading, error, refetch }),
-    [projects, loading, error, refetch]
+    () => ({
+      projects,
+      loading: isLoading,
+      error: errorMessage,
+      refetch: async () => {
+        await refetch()
+      },
+    }),
+    [projects, isLoading, errorMessage, refetch]
   )
 
   return (

@@ -7,7 +7,7 @@ import {
   updateAgent,
   archiveAgent,
 } from '../agents.service.js'
-import type { AgentRow, CreateAgentInput, UpdateAgentInput } from '../types.js'
+import type { AgentRow, CreateAgentInput } from '../types.js'
 
 describe('agents.service', () => {
   let mockQuery: ReturnType<typeof vi.fn>

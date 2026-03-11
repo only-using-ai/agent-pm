@@ -68,9 +68,12 @@ describe('context.service', () => {
 
   describe('listContextFiles', () => {
     it('returns sorted file entries', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(fs.readdir).mockResolvedValue(['b.txt', 'a.txt'] as any)
       vi.mocked(fs.stat)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .mockResolvedValueOnce({ isFile: () => true, size: 10, mtime: new Date('2025-01-01') } as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .mockResolvedValueOnce({ isFile: () => true, size: 20, mtime: new Date('2025-01-02') } as any)
       const result = await listContextFiles()
       expect(result).toHaveLength(2)
@@ -79,7 +82,9 @@ describe('context.service', () => {
     })
 
     it('skips unsafe names', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(fs.readdir).mockResolvedValue(['..', 'safe.txt'] as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(fs.stat).mockResolvedValue({ isFile: () => true, size: 0, mtime: new Date() } as any)
       const result = await listContextFiles()
       expect(result.some((e) => e.name === '..')).toBe(false)
@@ -90,6 +95,7 @@ describe('context.service', () => {
     it('writes buffer and returns entry', async () => {
       vi.mocked(fs.mkdir).mockResolvedValue(undefined)
       vi.mocked(fs.writeFile).mockResolvedValue(undefined)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(fs.stat).mockResolvedValue({ size: 5, mtime: new Date('2025-01-01') } as any)
       const result = await saveContextFile('dir/name.txt', Buffer.from('hello'))
       expect(result.name).toBe('name.txt')

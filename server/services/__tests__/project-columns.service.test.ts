@@ -8,7 +8,7 @@ import {
   updateColumn,
   deleteColumn,
 } from '../project-columns.service.js'
-import type { ProjectColumnRow, CreateProjectColumnInput, UpdateProjectColumnInput } from '../types.js'
+import type { ProjectColumnRow } from '../types.js'
 
 describe('project-columns.service', () => {
   let mockQuery: ReturnType<typeof vi.fn>

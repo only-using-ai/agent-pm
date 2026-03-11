@@ -118,6 +118,7 @@ describe('work-item-approved-handler', () => {
   })
 
   it('on stream error broadcasts stream_error', async () => {
+    // eslint-disable-next-line require-yield
     mockRunAgentStream.mockImplementation(async function* () {
       throw new Error('Stream failed')
     })

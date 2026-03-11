@@ -20,7 +20,7 @@ describe('ollama.service', () => {
       ok: true,
       json: () => Promise.resolve({ models: [{ name: 'llama3' }, { name: 'mistral' }] }),
       text: () => Promise.resolve(''),
-    } as any)
+    } as unknown as Response)
     const result = await fetchOllamaModels('http://localhost:11434')
     expect(result).toEqual({ ok: true, models: ['llama3', 'mistral'] })
     expect(fetch).toHaveBeenCalledWith('http://localhost:11434/api/tags')
@@ -31,7 +31,7 @@ describe('ollama.service', () => {
       ok: true,
       json: () => Promise.resolve({ models: [] }),
       text: () => Promise.resolve(''),
-    } as any)
+    } as unknown as Response)
     await fetchOllamaModels('http://localhost:11434/')
     expect(fetch).toHaveBeenCalledWith('http://localhost:11434/api/tags')
   })
@@ -41,7 +41,7 @@ describe('ollama.service', () => {
       ok: false,
       statusText: 'Not Found',
       text: () => Promise.resolve('not found'),
-    } as any)
+    } as unknown as Response)
     const result = await fetchOllamaModels()
     expect(result).toEqual({
       ok: false,

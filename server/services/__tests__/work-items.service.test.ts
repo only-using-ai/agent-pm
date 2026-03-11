@@ -12,10 +12,7 @@ import {
 import type {
   WorkItemRow,
   WorkItemWithProjectRow,
-  WorkItemWithCommentsRow,
   WorkItemCommentRow,
-  CreateWorkItemInput,
-  UpdateWorkItemInput,
 } from '../types.js'
 
 describe('work-items.service', () => {

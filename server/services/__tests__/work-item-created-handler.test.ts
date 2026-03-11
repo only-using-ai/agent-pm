@@ -222,6 +222,7 @@ describe('work-item-created-handler (LangChain)', () => {
   })
 
   it('on stream error broadcasts stream_error and does not throw', async () => {
+    // eslint-disable-next-line require-yield
     const mockRunAgentStream = vi.fn().mockImplementation(async function* () {
       throw new Error('Stream failed')
     })
@@ -281,6 +282,7 @@ describe('work-item-created-handler (LangChain)', () => {
   })
 
   it('on stream error with non-Error value broadcasts String(value) as message', async () => {
+    // eslint-disable-next-line require-yield
     const mockRunAgentStream = vi.fn().mockImplementation(async function* () {
       throw 'string error'
     })

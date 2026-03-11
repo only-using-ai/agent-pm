@@ -139,7 +139,7 @@ export function WorkItemsPage() {
       project_id?: string
     } | null
     if (state?.openCreate && !loading) {
-      setCreateForm((_prev) => ({
+      setCreateForm(() => ({
         ...defaultCreateForm,
         ...(state.title != null && { title: state.title }),
         ...(state.description != null && { description: state.description }),

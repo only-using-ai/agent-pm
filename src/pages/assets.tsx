@@ -433,7 +433,7 @@ export function AssetsPage() {
     } else {
       setSelectedProjectId(null)
     }
-  }, [projects])
+  }, [projects, selectedProjectId])
 
   useEffect(() => {
     if (selectedProjectId) {

@@ -7,7 +7,7 @@ import {
   updateMcpTool,
   deleteMcpTool,
 } from '../mcp.service.js'
-import type { McpToolRow, CreateMcpToolInput, UpdateMcpToolInput } from '../types.js'
+import type { McpToolRow, CreateMcpToolInput } from '../types.js'
 
 describe('mcp.service', () => {
   let mockQuery: ReturnType<typeof vi.fn>

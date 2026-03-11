@@ -15,11 +15,10 @@
 import { spawn } from 'node:child_process'
 import type { StreamChunk, ChatMessage } from './types.js'
 import type { WorkItemToolContext } from './langchain-tools.js'
+import { getCursorDefaultModel } from '../config.js'
 
 const CURSOR_CLI = 'cursor'
-const DEFAULT_MODEL = 'claude-4.5-sonnet-thinking'
 
-const AGENT_ACTION_PREFIX = '__AGENT_ACTION__'
 const AGENT_ACTION_REGEX = /^__AGENT_ACTION__\s+(\w+)\s+(.+)$/
 const WORK_ITEM_STATUS_VALUES = ['todo', 'in_progress', 'completed', 'blocked', 'canceled'] as const
 
@@ -326,7 +325,7 @@ async function* processContentWithActions(
 
 /** Extract tool name and args from a stream-json tool_call event. */
 function parseToolCallEvent(event: Record<string, unknown>): { id: string; name: string; args: string } | null {
-  const subtype = event.subtype as string
+  const _subtype = event.subtype as string
   const callId = (event.call_id as string) ?? ''
   const toolCall = event.tool_call as Record<string, unknown> | undefined
   if (!toolCall) return null
@@ -366,7 +365,7 @@ export async function* runCursorCLIStream(
   options?: CursorCLIRunOptions
 ): AsyncIterable<StreamChunk> {
   const prompt = messagesToSinglePrompt(messages)
-  const model = (options?.model?.trim() || process.env.CURSOR_MODEL || DEFAULT_MODEL).trim()
+  const model = (options?.model?.trim() || getCursorDefaultModel()).trim()
   const workspace = options?.workspace
   const env = { ...process.env, ...options?.env }
 
@@ -527,7 +526,7 @@ export async function runCursorCLI(
   options?: CursorCLIRunOptions
 ): Promise<{ content: string }> {
   const prompt = messagesToSinglePrompt(messages)
-  const model = (options?.model?.trim() || process.env.CURSOR_MODEL || DEFAULT_MODEL).trim()
+  const model = (options?.model?.trim() || getCursorDefaultModel()).trim()
   const workspace = options?.workspace
   const env = { ...process.env, ...options?.env }
 

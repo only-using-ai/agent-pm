@@ -1,13 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- exports InboxProvider and useInbox */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react'
-import { listInbox } from '@/lib/api'
+import { createContext, useContext, useMemo } from 'react'
+import { useInboxQuery } from '@/hooks/queries'
 
 type InboxContextValue = {
   count: number
@@ -17,23 +10,16 @@ type InboxContextValue = {
 const InboxContext = createContext<InboxContextValue | null>(null)
 
 export function InboxProvider({ children }: { children: React.ReactNode }) {
-  const [count, setCount] = useState(0)
-
-  const refetch = useCallback(async () => {
-    try {
-      const items = await listInbox()
-      setCount(items.length)
-    } catch {
-      setCount(0)
-    }
-  }, [])
-
-  useEffect(() => {
-    refetch()
-  }, [refetch])
+  const { data, refetch } = useInboxQuery()
+  const count = data?.length ?? 0
 
   const value = useMemo<InboxContextValue>(
-    () => ({ count, refetch }),
+    () => ({
+      count,
+      refetch: async () => {
+        await refetch()
+      },
+    }),
     [count, refetch]
   )
 

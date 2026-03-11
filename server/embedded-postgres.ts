@@ -30,7 +30,7 @@ async function detectPort(port: number): Promise<number> {
 }
 
 export async function startEmbeddedPostgres(): Promise<string> {
-  const { dataDir, port: configuredPort } = getEmbeddedPostgresConfig()
+  const { dataDir, port: configuredPort, verbose } = getEmbeddedPostgresConfig()
   let EmbeddedPostgres: EmbeddedPostgresCtor
   try {
     const mod = await import('embedded-postgres')
@@ -95,7 +95,7 @@ export async function startEmbeddedPostgres(): Promise<string> {
       port: portToUse,
       persistent: true,
       onLog: (msg) => {
-        if (process.env.AGENT_PM_EMBEDDED_PG_VERBOSE === 'true') {
+        if (verbose) {
           console.log('[embedded-postgres]', msg)
         }
       },

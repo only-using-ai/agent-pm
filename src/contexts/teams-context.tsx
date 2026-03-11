@@ -1,19 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- exports TeamsProvider and useTeams */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react'
-import { getApiBase } from '@/lib/api'
-
-export interface Team {
-  id: string
-  name: string
-  created_at: string
-}
+import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { useTeamsQuery, useCreateTeamMutation } from '@/hooks/queries'
+import type { Team } from '@/lib/api'
 
 interface TeamsContextValue {
   teams: Team[]
@@ -25,50 +13,32 @@ interface TeamsContextValue {
 
 const TeamsContext = createContext<TeamsContextValue | null>(null)
 
+export type { Team }
+
 export function TeamsProvider({ children }: { children: ReactNode }) {
-  const [teams, setTeams] = useState<Team[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data, isLoading, error, refetch } = useTeamsQuery()
+  const createTeamMutation = useCreateTeamMutation()
+  const teams = useMemo(() => data ?? [], [data])
+  const errorMessage = error instanceof Error ? error.message : null
 
-  const refetch = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`${getApiBase()}/api/teams`)
-      if (!res.ok) throw new Error('Failed to fetch teams')
-      const data = await res.json()
-      setTeams(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch teams')
-      setTeams([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const createTeam = useCallback(
-    async (name: string): Promise<Team> => {
-      const res = await fetch(`${getApiBase()}/api/teams`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)
-      await refetch()
-      return data
-    },
-    [refetch]
+  const value = useMemo<TeamsContextValue>(
+    () => ({
+      teams,
+      loading: isLoading,
+      error: errorMessage,
+      refetch: async () => {
+        await refetch()
+      },
+      createTeam: async (name: string) => {
+        const team = await createTeamMutation.mutateAsync(name)
+        return team
+      },
+    }),
+    [teams, isLoading, errorMessage, refetch, createTeamMutation]
   )
 
-  useEffect(() => {
-    refetch()
-  }, [refetch])
-
   return (
-    <TeamsContext.Provider value={{ teams, loading, error, refetch, createTeam }}>
-      {children}
-    </TeamsContext.Provider>
+    <TeamsContext.Provider value={value}>{children}</TeamsContext.Provider>
   )
 }
 

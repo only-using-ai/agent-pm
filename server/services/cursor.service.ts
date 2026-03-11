@@ -7,6 +7,7 @@
 
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
+import { getCursorApiKey } from '../config.js'
 
 const execAsync = promisify(exec)
 
@@ -52,6 +53,7 @@ export async function fetchCursorModelsFromApi(apiKey: string): Promise<CursorMo
 
 /** Strip ANSI escape sequences (e.g. [2K, [G, [1A). */
 function stripAnsi(text: string): string {
+  // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/\x1b\]?[^\x1b]*/g, '')
 }
 
@@ -84,7 +86,7 @@ function parseModelsOutput(raw: string): string[] {
  * valid for Cursor's API). Otherwise fall back to CLI "cursor agent models".
  */
 export async function fetchCursorModels(apiKey?: string): Promise<CursorModelsResult> {
-  const key = apiKey ?? process.env.CURSOR_API_KEY
+  const key = apiKey ?? getCursorApiKey()
   if (key?.trim()) {
     const apiResult = await fetchCursorModelsFromApi(key.trim())
     if (apiResult.ok && apiResult.models.length > 0) return apiResult
@@ -113,7 +115,7 @@ export async function fetchCursorModels(apiKey?: string): Promise<CursorModelsRe
       const models = parseModelsOutput(combined)
       if (models.length > 0) return { ok: true, models }
     }
-    if (err.code === 'ENOENT' || (err as any)?.killed) {
+    if (err.code === 'ENOENT' || (err as { killed?: boolean })?.killed) {
       return {
         ok: false,
         error: 'Cursor CLI not found. Install Cursor and ensure "cursor" is on PATH.',

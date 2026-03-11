@@ -4,9 +4,11 @@ import { exec } from 'node:child_process'
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>()
-  const mockExec = vi.fn((cmd: string, opts: any, cb?: (err: any, stdout: string, stderr: string) => void) => {
-    const callback = (typeof opts === 'function' ? opts : cb) as (err: any, stdout: string, stderr: string) => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockExec = vi.fn((cmd: string, opts: any, cb?: (err: Error | null, stdout: string, stderr: string) => void) => {
+    const callback = (typeof opts === 'function' ? opts : cb) as ((err: Error | null, stdout: string, stderr: string) => void) | undefined
     if (callback) callback(null, 'model-id - Display Name\n', '')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return {} as any
   })
   const mock = { ...actual, exec: mockExec }
@@ -33,7 +35,7 @@ describe('cursor.service', () => {
         ok: true,
         json: () => Promise.resolve({ models: ['gpt-4', 'claude-3'] }),
         text: () => Promise.resolve(''),
-      } as any)
+      } as unknown as Response)
       const result = await fetchCursorModelsFromApi('key')
       expect(result).toEqual({ ok: true, models: ['gpt-4', 'claude-3'] })
       expect(fetch).toHaveBeenCalledWith(
@@ -50,10 +52,10 @@ describe('cursor.service', () => {
         status: 401,
         statusText: 'Unauthorized',
         text: () => Promise.resolve('Invalid key'),
-      } as any)
+      } as unknown as Response)
       const result = await fetchCursorModelsFromApi('bad')
       expect(result.ok).toBe(false)
-      expect((result as any).error).toContain('Cursor API')
+      expect((result as { error: string }).error).toContain('Cursor API')
     })
 
     it('returns error on fetch throw', async () => {
@@ -69,7 +71,7 @@ describe('cursor.service', () => {
         ok: true,
         json: () => Promise.resolve({ models: ['model-1'] }),
         text: () => Promise.resolve(''),
-      } as any)
+      } as unknown as Response)
       const result = await fetchCursorModels('key')
       expect(result).toEqual({ ok: true, models: ['model-1'] })
       expect(exec).not.toHaveBeenCalled()
@@ -80,7 +82,7 @@ describe('cursor.service', () => {
         ok: true,
         json: () => Promise.resolve({ models: [] }),
         text: () => Promise.resolve(''),
-      } as any)
+      } as unknown as Response)
       const result = await fetchCursorModels('key')
       expect(exec).toHaveBeenCalledWith('cursor agent models', expect.any(Object), expect.any(Function))
       if (result.ok) expect(result.models).toBeDefined()

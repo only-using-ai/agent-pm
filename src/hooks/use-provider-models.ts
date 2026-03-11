@@ -15,6 +15,7 @@ export function useProviderModels(provider: string) {
   useEffect(() => {
     const path = MODEL_ENDPOINTS[provider?.toLowerCase() ?? '']
     if (!path) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setModels([])
       setLoading(false)
       setError(null)

@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
-import { listInbox, approveInboxItem, rejectInboxItem } from '@/lib/api'
-import { useInbox } from '@/contexts/inbox-context'
+import { useState } from 'react'
+import { listInbox } from '@/lib/api'
+import {
+  useInboxQuery,
+  useApproveInboxItemMutation,
+  useRejectInboxItemMutation,
+} from '@/hooks/queries'
 import {
   Check,
   ChevronRight,
@@ -71,34 +75,21 @@ function rowToInboxItem(row: Awaited<ReturnType<typeof listInbox>>[number]): Inb
 }
 
 export function InboxPage() {
-  const { refetch: refetchInbox } = useInbox()
-  const [items, setItems] = useState<InboxItem[]>([])
+  const { data: rows = [], isLoading: loading } = useInboxQuery()
+  const approveMutation = useApproveInboxItemMutation()
+  const rejectMutation = useRejectInboxItemMutation()
+  const items = rows.map(rowToInboxItem)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
-  const [loading, setLoading] = useState(true)
-
-  const loadInbox = useCallback(async () => {
-    setLoading(true)
-    try {
-      const rows = await listInbox()
-      setItems(rows.map(rowToInboxItem))
-    } catch {
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadInbox()
-  }, [loadInbox])
-
-  const selected = items.find((i) => i.id === selectedId)
+  const [dismissedOnReply, setDismissedOnReply] = useState<Set<string>>(new Set())
+  const [readIds, setReadIds] = useState<Set<string>>(new Set())
+  const visibleItems = items
+    .filter((i) => !dismissedOnReply.has(i.id))
+    .map((i) => ({ ...i, read: readIds.has(i.id) }))
+  const selected = visibleItems.find((i) => i.id === selectedId)
 
   const markRead = (id: string) => {
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, read: true } : i))
-    )
+    setReadIds((prev) => new Set(prev).add(id))
   }
 
   const handleSelect = (id: string) => {
@@ -109,10 +100,8 @@ export function InboxPage() {
 
   const handleApprove = async (id: string) => {
     try {
-      await approveInboxItem(id)
-      setItems((prev) => prev.filter((i) => i.id !== id))
+      await approveMutation.mutateAsync(id)
       if (selectedId === id) setSelectedId(null)
-      await refetchInbox()
     } catch {
       // keep item on failure
     }
@@ -120,10 +109,8 @@ export function InboxPage() {
 
   const handleReject = async (id: string) => {
     try {
-      await rejectInboxItem(id)
-      setItems((prev) => prev.filter((i) => i.id !== id))
+      await rejectMutation.mutateAsync(id)
       if (selectedId === id) setSelectedId(null)
-      await refetchInbox()
     } catch {
       // keep item on failure
     }
@@ -131,12 +118,12 @@ export function InboxPage() {
 
   const handleSendReply = (id: string) => {
     if (!replyText.trim()) return
-    setItems((prev) => prev.filter((i) => i.id !== id))
+    setDismissedOnReply((prev) => new Set(prev).add(id))
     if (selectedId === id) setSelectedId(null)
     setReplyText('')
   }
 
-  const unreadCount = items.filter((i) => !i.read).length
+  const unreadCount = visibleItems.filter((i) => !i.read).length
 
   return (
     <div className="flex h-[calc(100vh-8rem)] min-h-[420px] flex-col lg:flex-row">
@@ -155,7 +142,7 @@ export function InboxPage() {
               <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center text-muted-foreground">
                 <p className="text-sm">Loading…</p>
               </div>
-            ) : items.length === 0 ? (
+            ) : visibleItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center text-muted-foreground">
                 <MessageSquare className="size-10 opacity-50" />
                 <p className="text-sm">No messages</p>
@@ -164,7 +151,7 @@ export function InboxPage() {
                 </p>
               </div>
             ) : (
-              items.map((item) => (
+              visibleItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"

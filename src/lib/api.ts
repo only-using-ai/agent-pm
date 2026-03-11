@@ -81,6 +81,47 @@ export async function archiveProject(id: string): Promise<Project> {
   return res.json()
 }
 
+export type Agent = {
+  id: string
+  name: string
+  team_id: string
+  instructions: string | null
+  ai_provider: string | null
+  model: string | null
+  created_at: string
+}
+
+export async function listAgents(): Promise<Agent[]> {
+  const res = await fetch(`${getApiBase()}/api/agents`)
+  if (!res.ok) throw new Error('Failed to fetch agents')
+  return res.json()
+}
+
+export type CreateAgentBody = {
+  name: string
+  team_id: string
+  instructions?: string | null
+  ai_provider?: string | null
+  model?: string | null
+}
+
+export async function createAgent(body: CreateAgentBody): Promise<Agent> {
+  const res = await fetch(`${getApiBase()}/api/agents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: body.name.trim(),
+      team_id: body.team_id,
+      instructions: body.instructions ?? null,
+      ai_provider: body.ai_provider ?? null,
+      model: body.model ?? null,
+    }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Failed to create agent')
+  return data as Agent
+}
+
 export async function archiveAgent(id: string): Promise<{ id: string; name: string; archived_at: string }> {
   const res = await fetch(`${getApiBase()}/api/agents/${id}/archive`, {
     method: 'PATCH',
@@ -90,6 +131,29 @@ export async function archiveAgent(id: string): Promise<{ id: string; name: stri
     throw new Error((err as { error?: string }).error ?? 'Failed to archive agent')
   }
   return res.json()
+}
+
+export type Team = {
+  id: string
+  name: string
+  created_at: string
+}
+
+export async function listTeams(): Promise<Team[]> {
+  const res = await fetch(`${getApiBase()}/api/teams`)
+  if (!res.ok) throw new Error('Failed to fetch teams')
+  return res.json()
+}
+
+export async function createTeam(name: string): Promise<Team> {
+  const res = await fetch(`${getApiBase()}/api/teams`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name.trim() }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Request failed')
+  return data as Team
 }
 
 // Project columns (Kanban)
@@ -357,6 +421,83 @@ export async function rejectInboxItem(id: string): Promise<InboxItemRow> {
   const res = await fetch(`${getApiBase()}/api/inbox/${id}/reject`, { method: 'PATCH' })
   if (!res.ok) throw new Error('Failed to reject')
   return res.json()
+}
+
+// MCP tools
+export type McpTool = {
+  id: string
+  name: string
+  type: 'command' | 'url'
+  command?: string | null
+  args?: string[] | null
+  url?: string | null
+  env?: Record<string, string> | null
+  description?: string | null
+  created_at: string
+}
+
+export async function listMcpTools(): Promise<McpTool[]> {
+  const res = await fetch(`${getApiBase()}/api/mcp`)
+  if (!res.ok) throw new Error('Failed to load MCP tools')
+  const data = await res.json()
+  return Array.isArray(data) ? data : []
+}
+
+export type CreateMcpToolBody = {
+  name: string
+  type: 'command' | 'url'
+  command?: string | null
+  args?: string[]
+  url?: string | null
+  env?: Record<string, string>
+  description?: string | null
+}
+
+export async function createMcpTool(body: CreateMcpToolBody): Promise<McpTool> {
+  const res = await fetch(`${getApiBase()}/api/mcp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: body.name,
+      type: body.type,
+      command: body.command ?? null,
+      args: body.args ?? [],
+      url: body.url ?? null,
+      env: body.env ?? {},
+      description: body.description ?? null,
+    }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Failed to add MCP tool')
+  return data as McpTool
+}
+
+export type UpdateMcpToolBody = Partial<{
+  name: string
+  command: string | null
+  args: string[] | null
+  url: string | null
+  env: Record<string, string> | null
+  description: string | null
+}>
+
+export async function updateMcpTool(id: string, body: UpdateMcpToolBody): Promise<McpTool> {
+  const res = await fetch(`${getApiBase()}/api/mcp/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Failed to update MCP tool')
+  return data as McpTool
+}
+
+export async function deleteMcpTool(id: string): Promise<void> {
+  const res = await fetch(`${getApiBase()}/api/mcp/${id}`, { method: 'DELETE' })
+  if (!res.ok && res.status !== 204) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data as { error?: string }).error ?? 'Failed to remove MCP tool')
+  }
 }
 
 // Prompts (settings)

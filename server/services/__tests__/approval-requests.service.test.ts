@@ -78,7 +78,7 @@ describe('approval-requests.service', () => {
     it('inserts with type info_request', async () => {
       const row = { ...approvalRow, type: 'info_request' as const }
       mockQuery.mockResolvedValue({ rows: [row] })
-      const result = await createInfoRequest(pool, {
+      await createInfoRequest(pool, {
         work_item_id: 'wi1',
         project_id: 'p1',
         agent_id: null,

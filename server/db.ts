@@ -1,5 +1,4 @@
 import pg from 'pg'
-import { resolve } from 'node:path'
 
 const { Pool } = pg
 
@@ -254,14 +253,4 @@ export async function initDb(p: pg.Pool): Promise<void> {
   }
 }
 
-const DEFAULT_EMBEDDED_DATA_DIR = resolve(process.cwd(), '.agent-pm', 'db')
-const DEFAULT_EMBEDDED_PORT = 54329
-
-export function getEmbeddedPostgresConfig(): {
-  dataDir: string
-  port: number
-} {
-  const dataDir = process.env.AGENT_PM_EMBEDDED_PG_DATA_DIR ?? DEFAULT_EMBEDDED_DATA_DIR
-  const port = Number(process.env.AGENT_PM_EMBEDDED_PG_PORT) || DEFAULT_EMBEDDED_PORT
-  return { dataDir: resolve(dataDir), port }
-}
+export { getEmbeddedPostgresConfig } from './config.js'

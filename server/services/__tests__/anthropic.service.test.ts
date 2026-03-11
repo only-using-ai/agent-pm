@@ -30,7 +30,7 @@ describe('anthropic.service', () => {
       ok: true,
       json: () => Promise.resolve({ data: [{ id: 'claude-3-opus' }, { id: 'claude-3-sonnet' }] }),
       text: () => Promise.resolve(''),
-    } as any)
+    } as unknown as Response)
     const result = await fetchAnthropicModels()
     expect(result).toEqual({ ok: true, models: ['claude-3-opus', 'claude-3-sonnet'] })
   })
@@ -41,10 +41,10 @@ describe('anthropic.service', () => {
       ok: false,
       statusText: 'Unauthorized',
       text: () => Promise.resolve('Invalid key'),
-    } as any)
+    } as unknown as Response)
     const result = await fetchAnthropicModels()
     expect(result.ok).toBe(false)
-    expect((result as any).error).toContain('Failed to fetch Anthropic models')
+    expect((result as { error: string }).error).toContain('Failed to fetch Anthropic models')
   })
 
   it('returns error on fetch throw', async () => {
@@ -52,6 +52,6 @@ describe('anthropic.service', () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'))
     const result = await fetchAnthropicModels()
     expect(result.ok).toBe(false)
-    expect((result as any).error).toContain('Cannot reach Anthropic API')
+    expect((result as { error: string }).error).toContain('Cannot reach Anthropic API')
   })
 })

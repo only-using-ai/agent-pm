@@ -9,6 +9,7 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { ChatOpenAI } from '@langchain/openai'
 import { ChatAnthropic } from '@langchain/anthropic'
+import { config as serverConfig } from '../config.js'
 
 export type ProviderConfig = Record<string, string | number | boolean | undefined>
 
@@ -27,9 +28,9 @@ export function createModel(
   switch (id) {
     case 'ollama': {
       // Ollama exposes OpenAI-compatible API at baseUrl/v1; no real API key needed
-      const base = (config.baseUrl as string) ?? process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434'
+      const base = (config.baseUrl as string) ?? serverConfig.ollama.baseUrl
       const baseUrl = base.replace(/\/$/, '').endsWith('/v1') ? base.replace(/\/$/, '') : `${base.replace(/\/$/, '')}/v1`
-      const model = (modelName ?? config.model ?? process.env.OLLAMA_MODEL ?? 'llama3') as string
+      const model = (modelName ?? config.model ?? serverConfig.ollama.defaultModel) as string
       return new ChatOpenAI({
         apiKey: 'ollama', // placeholder; Ollama does not validate it (ChatOpenAI only reads fields.apiKey, not openAIApiKey)
         configuration: { baseURL: baseUrl },
@@ -39,14 +40,14 @@ export function createModel(
       })
     }
     case 'openai': {
-      const apiKey = (config.apiKey as string) ?? process.env.OPENAI_API_KEY ?? ''
+      const apiKey = (config.apiKey as string) ?? serverConfig.openai.apiKey
       if (!apiKey) {
         throw new Error(
           'OpenAI API key required. Set OPENAI_API_KEY or use a different agent provider (e.g. ollama).'
         )
       }
-      const baseUrl = (config.baseUrl as string) ?? process.env.OPENAI_BASE_URL
-      const model = (modelName ?? config.model ?? process.env.OPENAI_MODEL ?? 'gpt-4o-mini') as string
+      const baseUrl = (config.baseUrl as string) ?? serverConfig.openai.baseUrl
+      const model = (modelName ?? config.model ?? serverConfig.openai.defaultModel) as string
       return new ChatOpenAI({
         apiKey,
         configuration: baseUrl ? { baseURL: baseUrl } : undefined,
@@ -60,8 +61,8 @@ export function createModel(
         'Cursor uses the CLI for agent runs, not the API. createModel("cursor") is not used; runAgentStream/runAgent handle cursor via cursor-cli-runner.'
       )
     case 'anthropic': {
-      const apiKey = (config.apiKey as string) ?? process.env.ANTHROPIC_API_KEY ?? ''
-      const model = (modelName ?? config.model ?? process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-20241022') as string
+      const apiKey = (config.apiKey as string) ?? serverConfig.anthropic.apiKey
+      const model = (modelName ?? config.model ?? serverConfig.anthropic.defaultModel) as string
       return new ChatAnthropic({
         anthropicApiKey: apiKey || undefined,
         model,
