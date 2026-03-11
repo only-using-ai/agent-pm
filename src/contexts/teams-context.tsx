@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { getApiBase } from '@/lib/api'
 
 export interface Team {
   id: string
@@ -33,7 +34,7 @@ export function TeamsProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/teams')
+      const res = await fetch(`${getApiBase()}/api/teams`)
       if (!res.ok) throw new Error('Failed to fetch teams')
       const data = await res.json()
       setTeams(data)
@@ -47,7 +48,7 @@ export function TeamsProvider({ children }: { children: ReactNode }) {
 
   const createTeam = useCallback(
     async (name: string): Promise<Team> => {
-      const res = await fetch('/api/teams', {
+      const res = await fetch(`${getApiBase()}/api/teams`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim() }),

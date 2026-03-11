@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getApiBase } from '@/lib/api'
 
 const MODEL_ENDPOINTS: Record<string, string> = {
   ollama: '/api/ollama/models',
@@ -12,13 +13,14 @@ export function useProviderModels(provider: string) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const endpoint = MODEL_ENDPOINTS[provider?.toLowerCase() ?? '']
-    if (!endpoint) {
+    const path = MODEL_ENDPOINTS[provider?.toLowerCase() ?? '']
+    if (!path) {
       setModels([])
       setLoading(false)
       setError(null)
       return
     }
+    const endpoint = `${getApiBase()}${path}`
 
     let cancelled = false
     setLoading(true)

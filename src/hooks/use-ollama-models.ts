@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getApiBase } from '@/lib/api'
 
 export function useOllamaModels() {
   const [models, setModels] = useState<string[]>([])
@@ -11,7 +12,7 @@ export function useOllamaModels() {
       setLoading(true)
       setError(null)
     })
-    fetch('/api/ollama/models')
+    fetch(`${getApiBase()}/api/ollama/models`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return

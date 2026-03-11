@@ -173,6 +173,30 @@ describe('work-item-created-handler (LangChain)', () => {
     expect(mockBroadcaster.broadcastToAgent).not.toHaveBeenCalled()
   })
 
+  it('returns early when agent not found', async () => {
+    mockGetAgentById.mockResolvedValueOnce(null)
+    const { runAgentStream } = await import('../../agent/index.js')
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
+      getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+    })
+    await handler(mockPayload)
+    expect(mockBuildContext).not.toHaveBeenCalled()
+    expect(mockBroadcaster.broadcastToAgent).not.toHaveBeenCalled()
+  })
+
   it('returns early when require_approval is true (item goes to Inbox; agent starts on approve)', async () => {
     const { runAgentStream } = await import('../../agent/index.js')
     const handler = createWorkItemCreatedHandler({
@@ -195,5 +219,120 @@ describe('work-item-created-handler (LangChain)', () => {
     expect(mockGetAgentById).not.toHaveBeenCalled()
     expect(mockBuildContext).not.toHaveBeenCalled()
     expect(mockBroadcaster.broadcastToAgent).not.toHaveBeenCalled()
+  })
+
+  it('on stream error broadcasts stream_error and does not throw', async () => {
+    const mockRunAgentStream = vi.fn().mockImplementation(async function* () {
+      throw new Error('Stream failed')
+    })
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
+      getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream: mockRunAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+    })
+    await handler(mockPayload)
+    expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_error', {
+      message: 'Stream failed',
+    })
+  })
+
+  it('broadcasts tool_call chunks as content with "Tool: name" prefix', async () => {
+    const mockRunAgentStream = vi.fn().mockImplementation(async function* () {
+      yield { type: 'tool_call', name: 'search', arguments: '{}', id: 'tc-1' }
+      yield { type: 'content', text: 'Done.' }
+    })
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
+      getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream: mockRunAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+    })
+    await handler(mockPayload)
+    expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_chunk', {
+      chunk: 'Tool: search',
+      type: 'content',
+    })
+    expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_chunk', {
+      chunk: 'Done.',
+      type: 'content',
+    })
+    expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_end', {})
+  })
+
+  it('on stream error with non-Error value broadcasts String(value) as message', async () => {
+    const mockRunAgentStream = vi.fn().mockImplementation(async function* () {
+      throw 'string error'
+    })
+    const mockLogError = vi.fn()
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
+      getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream: mockRunAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+      logError: mockLogError,
+    })
+    await handler(mockPayload)
+    expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_error', {
+      message: 'string error',
+    })
+  })
+
+  it('uses custom log and logError when provided', async () => {
+    const mockLog = vi.fn()
+    const mockLogError = vi.fn()
+    const mockRunAgentStream = vi.fn().mockImplementation(async function* () {
+      yield { type: 'content', text: 'Hi' }
+    })
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
+      getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream: mockRunAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+      log: mockLog,
+      logError: mockLogError,
+    })
+    await handler(mockPayload)
+    expect(mockLog).toHaveBeenCalledWith('[agent Test Agent] ')
   })
 })

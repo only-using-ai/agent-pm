@@ -35,7 +35,7 @@ import { Streamdown } from 'streamdown'
 import { useAgentStream } from '@/contexts/agent-stream-context'
 import { useTeams } from '@/contexts/teams-context'
 import { useProviderModels } from '@/hooks/use-provider-models'
-import { archiveAgent } from '@/lib/api'
+import { archiveAgent, getApiBase } from '@/lib/api'
 import { AI_PROVIDERS } from '@/lib/ai-providers'
 
 export function AgentPage() {
@@ -85,7 +85,7 @@ export function AgentPage() {
     }
     let cancelled = false
     setSingleFetchDone(false)
-    fetch(`/api/agents/${agentId}`)
+    fetch(`${getApiBase()}/api/agents/${agentId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return
@@ -144,7 +144,7 @@ export function AgentPage() {
     setSaveError(null)
     setSaving(true)
     try {
-      const res = await fetch(`/api/agents/${agentId}`, {
+      const res = await fetch(`${getApiBase()}/api/agents/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

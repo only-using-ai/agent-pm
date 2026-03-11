@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { getApiBase } from '@/lib/api'
 
 export type StreamEvent =
   | 'stream_start'
@@ -59,7 +60,7 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
 
   // Global stream status (start/end) so sidebar can show green indicator for any agent
   useEffect(() => {
-    const es = new EventSource('/api/agents/stream-status')
+    const es = new EventSource(`${getApiBase()}/api/agents/stream-status`)
     streamStatusRef.current = es
     es.onmessage = (e) => {
       try {
@@ -116,7 +117,7 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
       eventSourceRef.current = null
       subscribedAgentIdRef.current = null
     }
-    const url = `/api/agents/${agentId}/stream`
+    const url = `${getApiBase()}/api/agents/${agentId}/stream`
     const es = new EventSource(url)
     eventSourceRef.current = es
     subscribedAgentIdRef.current = agentId

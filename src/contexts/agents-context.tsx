@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { getApiBase } from '@/lib/api'
 
 export interface Agent {
   id: string
@@ -36,7 +37,7 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/agents')
+      const res = await fetch(`${getApiBase()}/api/agents`)
       if (!res.ok) throw new Error('Failed to fetch agents')
       const data = await res.json()
       setAgents(data)

@@ -550,14 +550,22 @@ export function AssetsPage() {
 
   const handleMarkdownCheckboxClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = e.target
-      if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return
+      const target = e.target as HTMLElement
+      // Resolve checkbox: click might be on the input or on the label/text inside the task list item
+      const listItem = target.closest?.('.task-list-item, .contains-task-list li')
+      const checkbox = listItem
+        ? listItem.querySelector<HTMLInputElement>('input[type="checkbox"]')
+        : target instanceof HTMLInputElement && target.type === 'checkbox'
+          ? target
+          : null
+      if (!checkbox) return
       if (!selectedProjectId || !selectedFile || selectedFile.type !== 'file' || fileContent === null) return
       e.preventDefault()
       e.stopPropagation()
       const container = e.currentTarget
-      const checkboxes = Array.from(container.querySelectorAll<HTMLInputElement>('input[type=checkbox]'))
-      const index = checkboxes.indexOf(target)
+      // Only task-list checkboxes so index matches task-list line order
+      const checkboxes = Array.from(container.querySelectorAll<HTMLInputElement>('.contains-task-list input[type=checkbox]'))
+      const index = checkboxes.indexOf(checkbox)
       if (index < 0) return
       const lines = fileContent.split('\n')
       const taskListLineIndices: number[] = []
@@ -776,8 +784,8 @@ export function AssetsPage() {
                   selectedFile.name.toLowerCase().endsWith('.md') ? (
                     <div
                       data-color-mode={effectiveTheme}
-                      className="h-full min-h-0 flex flex-col overflow-hidden select-text [&_.w-md-editor]:!h-full [&_.w-md-editor]:!min-h-0 [&_.w-md-editor-toolbar]:!hidden [&_.w-md-editor-area]:!overflow-auto"
-                      onClick={handleMarkdownCheckboxClick}
+                      className="h-full min-h-0 flex flex-col overflow-hidden select-text [&_.w-md-editor]:!h-full [&_.w-md-editor]:!min-h-0 [&_.w-md-editor-toolbar]:!hidden [&_.w-md-editor-area]:!overflow-auto [&_input[type=checkbox]]:cursor-pointer"
+                      onClickCapture={handleMarkdownCheckboxClick}
                     >
                       <MDEditor
                         value={fileContent}
@@ -786,6 +794,13 @@ export function AssetsPage() {
                         preview="preview"
                         height="100%"
                         enableScroll={true}
+                        previewOptions={{
+                          rehypeRewrite: (node: { type?: string; tagName?: string; properties?: Record<string, unknown> }) => {
+                            if (node.type === 'element' && node.tagName === 'input' && node.properties?.type === 'checkbox') {
+                              if (node.properties) delete node.properties.disabled
+                            }
+                          },
+                        }}
                       />
                     </div>
                   ) : (

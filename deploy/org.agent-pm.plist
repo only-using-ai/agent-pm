@@ -6,7 +6,8 @@
 	<string>org.agent-pm</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>REPLACE_WITH_PROJECT_PATH/node_modules/.bin/tsx</string>
+		<string>REPLACE_WITH_NODE_PATH</string>
+		<string>REPLACE_WITH_PROJECT_PATH/node_modules/tsx/dist/cli.mjs</string>
 		<string>server/index.ts</string>
 	</array>
 	<key>WorkingDirectory</key>

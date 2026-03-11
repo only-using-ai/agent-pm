@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { getApiBase } from '@/lib/api'
 import { useProviderModels } from '@/hooks/use-provider-models'
 import { AI_PROVIDERS } from '@/lib/ai-providers'
 
@@ -76,7 +77,7 @@ export function AddAgentPage() {
     setSubmitError(null)
     setSubmitting(true)
     try {
-      const res = await fetch('/api/agents', {
+      const res = await fetch(`${getApiBase()}/api/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

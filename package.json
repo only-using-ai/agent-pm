@@ -7,6 +7,7 @@
     "dev": "concurrently \"npm run dev:server\" \"wait-on http://localhost:38472/api/health -t 60000 && vite\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:frontend": "vite",
+    "desktop": "npm run tauri:build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
@@ -15,11 +16,14 @@
     "pm": "tsx cli/index.ts",
     "daemon": "node deploy/run-daemon-install.js",
     "daemon:user": "node deploy/run-daemon-install.js --user",
+    "daemon:restart": "node deploy/run-daemon-restart.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:all": "npm run test:run -- --coverage && cd src-tauri && cargo test"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

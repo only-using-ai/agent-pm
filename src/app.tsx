@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AgentsProvider } from '@/contexts/agents-context'
+import { initLogToFile } from '@/lib/log-to-file'
 import { AgentStreamProvider } from '@/contexts/agent-stream-context'
 import { TeamsProvider } from '@/contexts/teams-context'
 import { AppSidebar } from '@/components/app-sidebar'
@@ -25,6 +27,10 @@ import { SettingsPage } from '@/pages/settings'
 import { WorkItemsPage } from '@/pages/work-items'
 
 function App() {
+  useEffect(() => {
+    return initLogToFile()
+  }, [])
+
   return (
     <AgentsProvider>
       <AgentStreamProvider>

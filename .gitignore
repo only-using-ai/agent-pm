@@ -25,3 +25,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Test coverage outputs
+coverage/
+
+# Security / audit reports
+audits/
+
+# Rust / Tauri build artifacts
+src-tauri/target/

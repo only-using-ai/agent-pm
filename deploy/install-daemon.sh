@@ -89,10 +89,16 @@ install_macos() {
     exit 1
   fi
 
+  NODE_PATH="$(command -v node 2>/dev/null)"
+  if [[ -z "$NODE_PATH" ]]; then
+    echo "Error: 'node' not found in PATH. Install Node or ensure it is on PATH when running this script." >&2
+    exit 1
+  fi
+
   if [[ -n "$USER_MODE" ]]; then
     PLIST_DIR="$HOME/Library/LaunchAgents"
     mkdir -p "$PLIST_DIR"
-    sed "s|REPLACE_WITH_PROJECT_PATH|$PROJECT_ROOT|g" "$PLIST_SRC" > "$PLIST_DIR/$PLIST_NAME"
+    sed -e "s|REPLACE_WITH_PROJECT_PATH|$PROJECT_ROOT|g" -e "s|REPLACE_WITH_NODE_PATH|$NODE_PATH|g" "$PLIST_SRC" > "$PLIST_DIR/$PLIST_NAME"
   else
     PLIST_DIR="/Library/LaunchDaemons"
     if [[ ! -w "/Library" ]]; then
@@ -101,7 +107,7 @@ install_macos() {
       echo "Or install for your user (no sudo): npm run daemon:user"
       exit 0
     fi
-    sed "s|REPLACE_WITH_PROJECT_PATH|$PROJECT_ROOT|g" "$PLIST_SRC" | sudo tee "$PLIST_DIR/$PLIST_NAME" > /dev/null
+    sed -e "s|REPLACE_WITH_PROJECT_PATH|$PROJECT_ROOT|g" -e "s|REPLACE_WITH_NODE_PATH|$NODE_PATH|g" "$PLIST_SRC" | sudo tee "$PLIST_DIR/$PLIST_NAME" > /dev/null
     sudo chown root:wheel "$PLIST_DIR/$PLIST_NAME"
   fi
 
