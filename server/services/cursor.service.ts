@@ -5,11 +5,11 @@
  * https://cursor.com/docs/cloud-agent/api/endpoints (GET /v0/models)
  */
 
-import { exec } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { getCursorApiKey } from '../config.js'
+import { getCursorApiKey, getCursorCliPath } from '../config.js'
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 const CURSOR_API_BASE = 'https://api.cursor.com'
 
@@ -96,15 +96,15 @@ export async function fetchCursorModels(apiKey?: string): Promise<CursorModelsRe
       // API failed; fall through to CLI so UI still gets CLI list if available
     }
   }
+  const cliPath = getCursorCliPath()
   const execOpts = {
     encoding: 'utf8' as const,
     timeout: 15_000,
     maxBuffer: 1024 * 1024,
-    shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
     env: { ...process.env },
   }
   try {
-    const { stdout, stderr } = await execAsync('cursor agent models', execOpts)
+    const { stdout, stderr } = await execFileAsync(cliPath, ['agent', 'models'], execOpts)
     const combined = [stdout, stderr].filter(Boolean).join('\n')
     const models = parseModelsOutput(combined)
     return { ok: true, models }

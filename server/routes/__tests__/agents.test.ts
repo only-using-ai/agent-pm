@@ -30,7 +30,12 @@ vi.mock('../../services/anthropic.service.js', () => ({
   fetchAnthropicModels: vi.fn(),
 }))
 
+vi.mock('../../services/work-items.service.js', () => ({
+  listWorkItemsByAgent: vi.fn(),
+}))
+
 import * as agentsService from '../../services/agents.service.js'
+import * as workItemsService from '../../services/work-items.service.js'
 import * as ollamaService from '../../services/ollama.service.js'
 import * as cursorService from '../../services/cursor.service.js'
 import * as anthropicService from '../../services/anthropic.service.js'
@@ -45,6 +50,7 @@ describe('agents routes', () => {
     vi.mocked(agentsService.createAgent).mockReset()
     vi.mocked(agentsService.updateAgent).mockReset()
     vi.mocked(agentsService.archiveAgent).mockReset()
+    vi.mocked(workItemsService.listWorkItemsByAgent).mockReset()
     mockQuery = vi.fn()
     pool = createMockPool(mockQuery)
   })
@@ -262,6 +268,65 @@ describe('agents routes', () => {
       })
       const app = appWithRouter('/api/agents', router)
       await request(app).get('/api/agents/a1').expect(500)
+    })
+  })
+
+  describe('GET /:id/work-items', () => {
+    it('returns work items for agent', async () => {
+      const agentRow = {
+        id: 'a1',
+        name: 'Agent 1',
+        team_id: 't1',
+        instructions: null,
+        ai_provider: 'ollama',
+        model: null,
+        created_at: '2025-01-01',
+        archived_at: null,
+      }
+      const workItems = [
+        {
+          id: 'w1',
+          project_id: 'p1',
+          title: 'Task',
+          description: null,
+          assigned_to: 'a1',
+          priority: 'Medium',
+          depends_on: null,
+          status: 'todo',
+          require_approval: false,
+          work_item_type: 'Task',
+          archived_at: null,
+          created_at: '2025-01-01',
+          updated_at: '2025-01-01',
+          project_name: 'Project 1',
+        },
+      ]
+      vi.mocked(agentsService.getAgentById).mockResolvedValue(agentRow)
+      vi.mocked(workItemsService.listWorkItemsByAgent).mockResolvedValue(workItems)
+      const router = createAgentsRouter({
+        getPool: createMockGetPool(pool),
+        sse: createMockSse(),
+        emit: () => {},
+        upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() },
+      })
+      const app = appWithRouter('/api/agents', router)
+      const res = await request(app).get('/api/agents/a1/work-items').expect(200)
+      expect(res.body).toEqual(workItems)
+      expect(workItemsService.listWorkItemsByAgent).toHaveBeenCalledWith(pool, 'a1')
+    })
+
+    it('returns 404 when agent not found', async () => {
+      vi.mocked(agentsService.getAgentById).mockResolvedValue(null)
+      const router = createAgentsRouter({
+        getPool: createMockGetPool(pool),
+        sse: createMockSse(),
+        emit: () => {},
+        upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() },
+      })
+      const app = appWithRouter('/api/agents', router)
+      const res = await request(app).get('/api/agents/missing/work-items')
+      expect(res.status).toBe(404)
+      expect(workItemsService.listWorkItemsByAgent).not.toHaveBeenCalled()
     })
   })
 

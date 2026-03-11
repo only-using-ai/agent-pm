@@ -14,15 +14,42 @@ import {
 import { ConfirmAlertDialog } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useQueryClient } from '@tanstack/react-query'
 import { getProject, updateProject, archiveProject } from '@/lib/api'
+import { queryKeys } from '@/lib/query-keys'
 import { useProjects } from '@/contexts/projects-context'
 import { useTheme } from '@/contexts/theme-context'
+import { cn } from '@/lib/utils'
 import type { Project } from '@/lib/api'
+
+const PROJECT_COLORS = [
+  null,
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#22c55e',
+  '#14b8a6',
+  '#3b82f6',
+  '#8b5cf6',
+  '#ec4899',
+] as const
+
+const PROJECT_ICONS = [
+  { value: null, label: 'None' },
+  { value: '📁', label: 'Folder' },
+  { value: '📋', label: 'Clipboard' },
+  { value: '🚀', label: 'Rocket' },
+  { value: '💼', label: 'Briefcase' },
+  { value: '🔧', label: 'Wrench' },
+  { value: '📌', label: 'Pin' },
+  { value: '⭐', label: 'Star' },
+] as const
 
 export function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { refetch } = useProjects()
+  const queryClient = useQueryClient()
   const { effectiveTheme } = useTheme()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -39,6 +66,10 @@ export function ProjectSettingsPage() {
   const [savingContext, setSavingContext] = useState(false)
   const [contextError, setContextError] = useState<string | null>(null)
   const [contextSaved, setContextSaved] = useState(false)
+  const [colorValue, setColorValue] = useState<string | null>(null)
+  const [iconValue, setIconValue] = useState<string | null>(null)
+  const [savingAppearance, setSavingAppearance] = useState(false)
+  const [appearanceError, setAppearanceError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!projectId) return
@@ -53,6 +84,8 @@ export function ProjectSettingsPage() {
             setNameValue(p.name)
             setPathValue(p.path ?? '')
             setContextValue(p.project_context ?? '')
+            setColorValue(p.color ?? null)
+            setIconValue(p.icon ?? null)
           }
         }
       })
@@ -136,6 +169,28 @@ export function ProjectSettingsPage() {
       setContextError(e instanceof Error ? e.message : 'Failed to save context')
     } finally {
       setSavingContext(false)
+    }
+  }
+
+  const handleSaveAppearance = async () => {
+    if (!projectId || !project) return
+    const nextColor = colorValue && colorValue.trim() ? colorValue.trim() : null
+    const nextIcon = iconValue && iconValue.trim() ? iconValue.trim() : null
+    if ((project.color ?? null) === nextColor && (project.icon ?? null) === nextIcon) return
+    setAppearanceError(null)
+    setSavingAppearance(true)
+    try {
+      const updated = await updateProject(projectId, { color: nextColor, icon: nextIcon })
+      setProject(updated)
+      await refetch()
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() })
+      if (projectId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) })
+      }
+    } catch (e) {
+      setAppearanceError(e instanceof Error ? e.message : 'Failed to save appearance')
+    } finally {
+      setSavingAppearance(false)
     }
   }
 
@@ -291,6 +346,76 @@ export function ProjectSettingsPage() {
                 <span className="text-sm text-muted-foreground">Saved.</span>
               )}
             </div>
+          </div>
+          <div className="space-y-4">
+            <Label>Appearance</Label>
+            <p className="text-sm text-muted-foreground">
+              Set a project color or icon. The color appears as a small square next to the project in the sidebar.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Project color</p>
+                <div className="flex flex-wrap gap-2">
+                  {PROJECT_COLORS.map((c) => (
+                    <button
+                      key={c ?? 'none'}
+                      type="button"
+                      onClick={() => {
+                        setColorValue(c)
+                      }}
+                      className={cn(
+                        'size-8 rounded-md border-2 transition-shadow shrink-0',
+                        colorValue === c
+                          ? 'border-foreground ring-2 ring-offset-2 ring-offset-background ring-foreground/20'
+                          : 'border-transparent hover:ring-2 hover:ring-offset-2 hover:ring-offset-background hover:ring-muted-foreground/30'
+                      )}
+                      style={c ? { backgroundColor: c } : undefined}
+                      title={c ? c : 'No color'}
+                      aria-label={c ? `Color ${c}` : 'No color'}
+                    >
+                      {!c && (
+                        <span className="text-muted-foreground text-xs font-medium">—</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Project icon</p>
+                <div className="flex flex-wrap gap-2">
+                  {PROJECT_ICONS.map(({ value, label }) => (
+                    <button
+                      key={value ?? 'none'}
+                      type="button"
+                      onClick={() => setIconValue(value)}
+                      className={cn(
+                        'flex size-9 items-center justify-center rounded-md border text-lg transition-colors shrink-0',
+                        iconValue === value
+                          ? 'border-foreground bg-sidebar-accent'
+                          : 'border-border hover:bg-sidebar-accent'
+                      )}
+                      title={label}
+                      aria-label={label}
+                    >
+                      {value ?? '—'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {appearanceError && (
+              <p className="text-sm text-destructive">{appearanceError}</p>
+            )}
+            <Button
+              onClick={handleSaveAppearance}
+              disabled={
+                savingAppearance ||
+                ((project.color ?? null) === (colorValue ?? null) &&
+                  (project.icon ?? null) === (iconValue ?? null))
+              }
+            >
+              {savingAppearance ? 'Saving…' : 'Save appearance'}
+            </Button>
           </div>
           <div>
             <h3 className="text-sm font-medium text-muted-foreground">Danger zone</h3>

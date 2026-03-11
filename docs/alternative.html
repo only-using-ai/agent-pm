@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent PM – Work Items for AI Agents | Kanban, Inbox, CLI &amp; Desktop</title>
+  <meta name="description" content="Agent PM lets you create projects, assign work to AI agents (e.g. Cursor CLI), and track progress. Kanban boards, inbox, CLI, and desktop app in one. Run the API on port 38472." />
+  <meta name="keywords" content="Agent PM, AI agents, work items, project management, Kanban, Cursor CLI, AI workflow, agent assignment" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://agent-pm.example/docs/alternative.html" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Agent PM – Work Items for AI Agents" />
+  <meta property="og:description" content="Create projects, assign work to AI agents, track progress. Kanban, inbox, CLI, desktop app." />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Theme for AI agents / crawlers -->
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="color-scheme" content="dark" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Syne', 'system-ui', 'sans-serif'],
+            body: ['DM Sans', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              100: '#cffafe',
+              200: '#a5f3fc',
+              300: '#67e8f9',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              700: '#0e7490',
+              800: '#155e75',
+              900: '#164e63',
+            },
+            surface: {
+              950: '#0b0f1a',
+              900: '#0f172a',
+              800: '#1e293b',
+              700: '#334155',
+              600: '#475569',
+            },
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.6s ease-out forwards',
+            'slide-up': 'slideUp 0.6s ease-out forwards',
+            'glow': 'glow 3s ease-in-out infinite',
+          },
+          keyframes: {
+            fadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
+            slideUp: { from: { opacity: '0', transform: 'translateY(20px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+            glow: { '0%, 100%': { opacity: '0.6' }, '50%': { opacity: '1' } },
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --accent: #22d3ee;
+      --accent-muted: #06b6d4;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+    body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    .font-display { font-family: 'Syne', system-ui, sans-serif; }
+    .noise::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+    .gradient-orb {
+      position: fixed;
+      width: 60vw;
+      height: 60vw;
+      max-width: 800px;
+      max-height: 800px;
+      top: -20%;
+      right: -15%;
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.15) 0%, transparent 60%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      animation: glow 8s ease-in-out infinite;
+    }
+    .gradient-orb-2 {
+      position: fixed;
+      width: 40vw;
+      height: 40vw;
+      max-width: 500px;
+      bottom: -10%;
+      left: -10%;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      animation: glow 6s ease-in-out infinite reverse;
+    }
+    @keyframes glow { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.05); } }
+    [data-animate] { opacity: 1; }
+    [data-animate].in-view { animation: slideUp 0.7s ease-out forwards; }
+    @keyframes slideUp { from { opacity: 0.6; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .card-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.4), 0 0 0 1px rgba(34, 211, 238, 0.1); }
+    .focus-ring:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  </style>
+</head>
+<body class="antialiased text-slate-200 min-h-screen">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="gradient-orb" aria-hidden="true"></div>
+  <div class="gradient-orb-2" aria-hidden="true"></div>
+
+  <!-- JSON-LD for SEO and AI -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Agent PM",
+    "applicationCategory": "DeveloperApplication",
+    "description": "Agent PM lets you create projects, assign work items to AI agents (e.g. Cursor CLI), and track progress. Includes Kanban boards, inbox, CLI, and desktop app.",
+    "featureList": ["Work items for AI agents", "Kanban boards", "Inbox with approval workflow", "CLI (pm)", "Desktop app (Tauri)", "API on port 38472"],
+    "operatingSystem": "Web, Windows, macOS, Linux"
+  }
+  </script>
+
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-500 focus:text-surface-900 focus:rounded-lg">Skip to main content</a>
+
+  <header class="fixed top-0 left-0 right-0 z-40 border-b border-white/5 bg-surface-900/80 backdrop-blur-xl transition-all duration-300" id="site-header">
+    <nav class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between" aria-label="Main navigation">
+      <a href="#" class="font-display font-bold text-xl text-white focus-ring rounded-lg px-2 py-1">
+        Agent <span class="text-brand-400">PM</span>
+      </a>
+      <ul class="flex items-center gap-6">
+        <li><a href="#features" class="text-slate-400 hover:text-white transition focus-ring rounded px-2 py-1">Features</a></li>
+        <li><a href="#how-it-works" class="text-slate-400 hover:text-white transition focus-ring rounded px-2 py-1">How it works</a></li>
+        <li><a href="#get-started" class="text-slate-400 hover:text-white transition focus-ring rounded px-2 py-1">Get started</a></li>
+        <li><a href="#get-started" class="inline-flex items-center px-4 py-2 rounded-lg bg-brand-500 text-surface-900 font-semibold hover:bg-brand-400 transition focus-ring">Get started</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main" class="relative z-10 pt-24 pb-20">
+    <!-- Hero -->
+    <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-24" aria-labelledby="hero-heading">
+      <h1 id="hero-heading" class="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight max-w-4xl mb-6" data-animate>
+        Work items for <span class="text-brand-400">AI agents</span>
+      </h1>
+      <p class="text-xl sm:text-2xl text-slate-400 max-w-2xl mb-10 leading-relaxed" data-animate>
+        Create projects, assign work to agents, and track progress. Kanban boards, inbox, CLI, and a desktop app—all in one.
+      </p>
+      <div class="flex flex-wrap gap-4" data-animate>
+        <a href="#get-started" class="inline-flex items-center px-6 py-3 rounded-xl bg-brand-500 text-surface-900 font-semibold hover:bg-brand-400 transition focus-ring shadow-lg shadow-brand-500/25">
+          Get started
+        </a>
+        <a href="#features" class="inline-flex items-center px-6 py-3 rounded-xl border border-slate-600 text-slate-300 hover:border-brand-500/50 hover:text-white transition focus-ring">
+          See features
+        </a>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 scroll-mt-24" aria-labelledby="features-heading">
+      <p class="text-brand-400 font-semibold uppercase tracking-wider text-sm mb-2" data-animate>Features</p>
+      <h2 id="features-heading" class="font-display text-3xl sm:text-4xl font-bold text-white mb-4" data-animate>Built for agent-led workflows</h2>
+      <p class="text-slate-400 max-w-2xl mb-14 text-lg" data-animate>
+        Agent PM keeps your AI agents (e.g. Cursor CLI) aligned with your projects. Create work items, assign them to agents, and optionally require approval before work begins.
+      </p>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 card-hover" data-animate>
+          <div class="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center text-brand-400 mb-4">📋</div>
+          <h3 class="font-display font-semibold text-lg text-white mb-2">Work items</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">Create and assign tasks with title, description, project, and agent. Optional approval gate so you control when work starts.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 card-hover" data-animate>
+          <div class="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center text-brand-400 mb-4">📊</div>
+          <h3 class="font-display font-semibold text-lg text-white mb-2">Kanban boards</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">Visualize projects with columns. Drag and drop cards. Same data powers the API, web UI, and CLI.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 card-hover" data-animate>
+          <div class="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center text-brand-400 mb-4">📬</div>
+          <h3 class="font-display font-semibold text-lg text-white mb-2">Inbox</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">Agents see assigned work in an inbox. Require approval so items stay in inbox until you approve them.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 card-hover" data-animate>
+          <div class="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center text-brand-400 mb-4">⌘</div>
+          <h3 class="font-display font-semibold text-lg text-white mb-2">CLI</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">Use <code class="text-brand-400 bg-surface-700 px-1 rounded">pm</code> to create work items and assign agents from the terminal. Config via .pmrc.json.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 card-hover" data-animate>
+          <div class="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center text-brand-400 mb-4">🖥</div>
+          <h3 class="font-display font-semibold text-lg text-white mb-2">Desktop app</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">Tauri-based native app. Same React UI; runs against the API. Optional daemon for always-on.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 card-hover" data-animate>
+          <div class="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center text-brand-400 mb-4">🔌</div>
+          <h3 class="font-display font-semibold text-lg text-white mb-2">API</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">REST API on port 38472. One backend for web, desktop, and CLI. Install as daemon (systemd, launchd, or Windows Task).</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how-it-works" class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 scroll-mt-24" aria-labelledby="how-heading">
+      <p class="text-brand-400 font-semibold uppercase tracking-wider text-sm mb-2" data-animate>Run it your way</p>
+      <h2 id="how-heading" class="font-display text-3xl sm:text-4xl font-bold text-white mb-4" data-animate>Web app, desktop app, or CLI</h2>
+      <p class="text-slate-400 max-w-2xl mb-14 text-lg" data-animate>One product, three ways to use it. The API runs on port 38472; the same data powers the GUI and the CLI.</p>
+      <div class="grid sm:grid-cols-3 gap-6">
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 text-center card-hover" data-animate>
+          <div class="text-3xl mb-3">🌐</div>
+          <h3 class="font-display font-semibold text-white mb-2">Web app</h3>
+          <p class="text-slate-400 text-sm mb-4">Run the full UI in your browser. Start the API and Vite, then open the app.</p>
+          <code class="block text-left text-xs bg-surface-900 rounded-lg p-3 text-brand-300 font-mono">npm run dev → localhost:5173</code>
+        </article>
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 text-center card-hover" data-animate>
+          <div class="text-3xl mb-3">🖥</div>
+          <h3 class="font-display font-semibold text-white mb-2">Desktop app</h3>
+          <p class="text-slate-400 text-sm mb-4">Tauri desktop app. Same React UI; optional daemon for always-on.</p>
+          <code class="block text-left text-xs bg-surface-900 rounded-lg p-3 text-brand-300 font-mono">npm run tauri:dev</code>
+        </article>
+        <article class="rounded-2xl border border-slate-700/50 bg-surface-800/50 p-6 text-center card-hover" data-animate>
+          <div class="text-3xl mb-3">⌘</div>
+          <h3 class="font-display font-semibold text-white mb-2">CLI</h3>
+          <p class="text-slate-400 text-sm mb-4">Create work items and assign agents from the terminal.</p>
+          <code class="block text-left text-xs bg-surface-900 rounded-lg p-3 text-brand-300 font-mono break-all">pm wi --create --title "Task" …</code>
+        </article>
+      </div>
+    </section>
+
+    <!-- Get started -->
+    <section id="get-started" class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 scroll-mt-24" aria-labelledby="start-heading">
+      <p class="text-brand-400 font-semibold uppercase tracking-wider text-sm mb-2" data-animate>Get started</p>
+      <h2 id="start-heading" class="font-display text-3xl sm:text-4xl font-bold text-white mb-4" data-animate>Quick start</h2>
+      <p class="text-slate-400 max-w-2xl mb-8 text-lg" data-animate">The API server runs on port <strong class="text-white">38472</strong> by default. Install as a daemon for background use.</p>
+      <pre class="rounded-xl border border-slate-700 bg-surface-800 p-4 sm:p-6 overflow-x-auto text-sm text-slate-300 font-mono mb-8" data-animate><code><span class="text-brand-400">$</span> pm wi --create --title <span class="text-amber-300">"Fix login bug"</span> --summary <span class="text-amber-300">"Reproduce and fix"</span> --project <span class="text-amber-300">"My Project"</span> --agent <span class="text-amber-300">"Backend Agent"</span>
+<span class="text-brand-400">$</span> pm wi --create --title <span class="text-amber-300">"Deploy to prod"</span> --project <span class="text-amber-300">"My Project"</span> --agent <span class="text-amber-300">"DevOps Agent"</span> <span class="text-emerald-400">--require-approval</span></code></pre>
+      <div class="flex flex-wrap gap-4 text-slate-400 text-sm" data-animate>
+        <span class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-800 border border-slate-700">Browser: <code class="text-brand-400">npm run dev</code> → localhost:5173</span>
+        <span class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-800 border border-slate-700">Desktop: <code class="text-brand-400">npm run tauri:dev</code></span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="relative z-10 border-t border-slate-800 py-8">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <span class="font-display font-semibold text-white">Agent <span class="text-brand-400">PM</span></span>
+      <p class="text-slate-500 text-sm">Work items for AI agents. Kanban, inbox, CLI, desktop.</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      function runObserver() {
+        var els = document.querySelectorAll('[data-animate]');
+        if (!els.length) return;
+        var observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) entry.target.classList.add('in-view');
+          });
+        }, { rootMargin: '0px 0px -60px 0px', threshold: 0.05 });
+        els.forEach(function (el) { observer.observe(el); });
+        setTimeout(function () {
+          els.forEach(function (el) {
+            var rect = el.getBoundingClientRect();
+            if (rect.top < window.innerHeight) el.classList.add('in-view');
+          });
+        }, 100);
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { requestAnimationFrame(runObserver); });
+      } else {
+        requestAnimationFrame(runObserver);
+      }
+    })();
+  </script>
+</body>
+</html>

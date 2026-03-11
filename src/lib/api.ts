@@ -12,6 +12,8 @@ export type Project = {
   description: string | null
   path: string | null
   project_context: string | null
+  color: string | null
+  icon: string | null
   created_at: string
   archived_at?: string | null
 }
@@ -55,6 +57,8 @@ export type UpdateProjectBody = {
   description?: string | null
   path?: string | null
   project_context?: string | null
+  color?: string | null
+  icon?: string | null
 }
 
 export async function updateProject(id: string, body: UpdateProjectBody): Promise<Project> {
@@ -235,6 +239,7 @@ export async function deleteProjectColumn(
 // Work items
 export type WorkItemPriority = 'Low' | 'Medium' | 'High' | 'Critical'
 export type WorkItemStatus = 'todo' | 'in_progress' | 'completed' | 'blocked' | 'canceled'
+export type WorkItemType = 'Bug' | 'Feature' | 'Story' | 'Task'
 
 export type WorkItem = {
   id: string
@@ -247,6 +252,8 @@ export type WorkItem = {
   /** Column id (e.g. 'todo' or custom column id) */
   status: string
   require_approval: boolean
+  /** Bug | Feature | Story | Task (defaults to Task if missing) */
+  work_item_type?: WorkItemType
   archived_at: string | null
   created_at: string
   updated_at: string
@@ -306,6 +313,7 @@ export type CreateWorkItemBody = {
   /** Column id (defaults to 'todo' if not provided) */
   status?: string
   require_approval?: boolean
+  work_item_type?: WorkItemType
   asset_ids?: string[]
 }
 
@@ -331,6 +339,7 @@ export type UpdateWorkItemBody = Partial<{
   /** Column id when moving between columns */
   status: string
   require_approval: boolean
+  work_item_type: WorkItemType
   asset_ids: string[]
 }>
 

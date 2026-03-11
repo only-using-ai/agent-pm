@@ -26,7 +26,6 @@ const APP_PAGES: CommandPaletteItem[] = [
   { type: 'page', id: 'page:dashboard', label: 'Dashboard', url: '/' },
   { type: 'page', id: 'page:inbox', label: 'Inbox', url: '/inbox' },
   { type: 'page', id: 'page:work-items', label: 'Work Items', url: '/work-items' },
-  { type: 'page', id: 'page:context', label: 'Context', url: '/context' },
   { type: 'page', id: 'page:assets', label: 'Assets', url: '/assets' },
   { type: 'page', id: 'page:mcp', label: 'MCP and Tools', url: '/mcp' },
   { type: 'page', id: 'page:profile', label: 'Profile', url: '/profile' },

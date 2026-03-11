@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent PM — Work item and project management for AI agents</title>
+  <meta name="description" content="Assign work to AI agents. Kanban boards, inbox, CLI, and desktop app. Run in browser or as a Tauri app." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a09;
+      --surface: #141412;
+      --surface-elevated: #1c1b18;
+      --border: #2a2824;
+      --text: #ebe9e4;
+      --text-muted: #8c8982;
+      --accent: #d4a853;
+      --accent-dim: #b8923f;
+      --accent-glow: rgba(212, 168, 83, 0.18);
+      --accent-subtle: rgba(212, 168, 83, 0.08);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      font-size: 1.0625rem;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    .noise {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    .gradient-orb {
+      position: fixed;
+      width: 90vmax;
+      height: 90vmax;
+      border-radius: 50%;
+      background: radial-gradient(circle at 60% 20%, var(--accent-glow) 0%, transparent 50%);
+      top: -40vmax;
+      right: -30vmax;
+      pointer-events: none;
+    }
+    .gradient-orb-2 {
+      position: fixed;
+      width: 60vmax;
+      height: 60vmax;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 70%, rgba(212, 168, 83, 0.06) 0%, transparent 55%);
+      bottom: -20vmax;
+      left: -15vmax;
+      pointer-events: none;
+    }
+
+    header {
+      position: relative;
+      padding: 1.25rem 1.5rem 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .logo {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .logo span { color: var(--accent); }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+    nav a:hover { color: var(--accent); }
+
+    main { position: relative; max-width: 1200px; margin: 0 auto; padding: 0 1.5rem 6rem; }
+
+    .hero {
+      padding: 4.5rem 0 5.5rem;
+      text-align: center;
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: clamp(2.75rem, 8vw, 4.5rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      margin: 0 0 1.5rem;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards;
+    }
+    .hero .tagline {
+      font-size: clamp(1.125rem, 2.5vw, 1.5rem);
+      color: var(--text-muted);
+      max-width: 32em;
+      margin: 0 auto 2.25rem;
+      line-height: 1.5;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.1s forwards;
+    }
+    .hero-cta {
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.22s forwards;
+    }
+    .hero-cta a {
+      display: inline-block;
+      padding: 1rem 2rem;
+      background: var(--accent);
+      color: var(--bg);
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      border-radius: var(--radius);
+      transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 0 0 1px rgba(212, 168, 83, 0.25), 0 4px 20px rgba(212, 168, 83, 0.15);
+    }
+    .hero-cta a:hover {
+      background: var(--accent-dim);
+      transform: translateY(-2px);
+      box-shadow: 0 0 0 1px rgba(212, 168, 83, 0.3), 0 8px 28px rgba(212, 168, 83, 0.2);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .section-label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+    section {
+      margin: 5rem 0;
+    }
+    section h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(1.875rem, 4.5vw, 2.5rem);
+      letter-spacing: -0.03em;
+      margin: 0 0 1rem;
+      color: var(--text);
+    }
+    section .section-desc {
+      color: var(--text-muted);
+      margin: 0 0 2rem;
+      max-width: 40em;
+      font-size: 1.0625rem;
+    }
+
+    /* Screenshot / mockup frames */
+    .mockup-browser {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.35);
+    }
+    .mockup-browser .chrome {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .mockup-browser .chrome-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .mockup-browser .chrome-dots span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+    .mockup-browser .chrome-dots span:nth-child(1) { background: #5a5a58; }
+    .mockup-browser .chrome-dots span:nth-child(2) { background: #5a5a58; }
+    .mockup-browser .chrome-dots span:nth-child(3) { background: #5a5a58; }
+    .mockup-browser .chrome-url {
+      flex: 1;
+      text-align: center;
+      font-family: ui-monospace, monospace;
+    }
+    .mockup-browser .content {
+      padding: 1rem;
+      min-height: 200px;
+    }
+
+    .mockup-terminal {
+      background: #0f0f0e;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+      font-size: 0.8125rem;
+      line-height: 1.7;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+    }
+    .mockup-terminal .chrome {
+      padding: 8px 14px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .mockup-terminal .body {
+      padding: 1rem 1.25rem;
+      color: var(--text-muted);
+    }
+    .mockup-terminal .prompt { color: var(--accent); }
+    .mockup-terminal .flag { color: #8ab4a0; }
+    .mockup-terminal .string { color: #c9a0dc; }
+
+    /* Kanban mockup content */
+    .kanban-mockup { display: flex; gap: 12px; overflow-x: auto; padding: 4px 0; }
+    .kanban-mockup .col {
+      min-width: 180px;
+      background: var(--surface-elevated);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      border: 1px solid var(--border);
+    }
+    .kanban-mockup .col h4 {
+      margin: 0 0 8px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+    .kanban-mockup .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .kanban-mockup .card:last-child { margin-bottom: 0; }
+
+    /* Inbox mockup content */
+    .inbox-mockup { display: flex; gap: 0; min-height: 220px; }
+    .inbox-mockup .list {
+      width: 42%;
+      border-right: 1px solid var(--border);
+      padding: 8px 0;
+    }
+    .inbox-mockup .list-item {
+      padding: 10px 14px;
+      font-size: 13px;
+      border-left: 3px solid transparent;
+      cursor: default;
+      color: var(--text-muted);
+    }
+    .inbox-mockup .list-item.active {
+      background: var(--accent-subtle);
+      border-left-color: var(--accent);
+      color: var(--text);
+    }
+    .inbox-mockup .list-item .from { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .inbox-mockup .detail {
+      flex: 1;
+      padding: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .inbox-mockup .detail .subject { font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .inbox-mockup .detail .actions { margin-top: 12px; display: flex; gap: 8px; }
+    .inbox-mockup .detail .btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface-elevated);
+      color: var(--text);
+    }
+    .inbox-mockup .detail .btn.approve { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+    /* Platform cards (Web / Desktop / CLI) */
+    .platforms-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    @media (max-width: 900px) {
+      .platforms-grid { grid-template-columns: 1fr; }
+    }
+    .platform-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    .platform-card:hover {
+      border-color: var(--accent-dim);
+      box-shadow: 0 0 0 1px var(--accent-glow);
+    }
+    .platform-card .icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--accent-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 1.25rem;
+    }
+    .platform-card h3 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.25rem;
+      margin: 0 0 0.5rem;
+      color: var(--text);
+    }
+    .platform-card p {
+      margin: 0;
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .platform-card .cmd {
+      margin-top: 1rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-elevated);
+      border-radius: 8px;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8125rem;
+      color: var(--accent);
+    }
+
+    .platforms-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .platform-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.25rem;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.9375rem;
+      color: var(--text);
+    }
+    .platform-badge code { color: var(--accent); font-size: 0.875em; }
+
+    /* Screenshots section layout */
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+    @media (max-width: 900px) {
+      .screenshots-grid { grid-template-columns: 1fr; }
+    }
+    .screenshot-block h3 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.125rem;
+      margin: 0 0 0.5rem;
+      color: var(--text);
+    }
+    .screenshot-block p {
+      margin: 0 0 1rem;
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+    }
+    .screenshot-block .mockup-browser,
+    .screenshot-block .mockup-terminal { margin-top: 0.5rem; }
+
+    .screenshot-block.full-width {
+      grid-column: 1 / -1;
+    }
+    .screenshot-block.full-width .mockup-browser { max-width: 900px; margin-left: auto; margin-right: auto; }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+      margin-top: 2rem;
+    }
+    @media (max-width: 700px) {
+      .features { grid-template-columns: 1fr; }
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .feature-card:hover {
+      border-color: var(--accent-dim);
+      box-shadow: 0 0 0 1px var(--accent-glow);
+    }
+    .feature-card h3 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.125rem;
+      margin: 0 0 0.5rem;
+      color: var(--text);
+    }
+    .feature-card p {
+      margin: 0;
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    .cli-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+    .cli-block .prompt { color: var(--accent); }
+    .cli-block .flag { color: #8ab4a0; }
+    .cli-block .string { color: #c9a0dc; }
+
+    .cta-section {
+      text-align: center;
+      padding: 4rem 2rem;
+      background: linear-gradient(180deg, var(--accent-subtle) 0%, transparent 100%);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin: 4rem 0;
+    }
+    .cta-section h2 { margin-bottom: 0.75rem; }
+    .cta-section p { margin: 0 auto 1.5rem; max-width: 28em; }
+    .cta-section a {
+      display: inline-block;
+      padding: 0.875rem 1.75rem;
+      background: var(--accent);
+      color: var(--bg);
+      font-family: var(--font-display);
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: var(--radius);
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+    .cta-section a:hover { background: var(--accent-dim); transform: translateY(-2px); }
+
+    footer {
+      margin-top: 5rem;
+      padding: 2.5rem 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="gradient-orb" aria-hidden="true"></div>
+  <div class="gradient-orb-2" aria-hidden="true"></div>
+
+  <header>
+    <a href="#" class="logo">Agent <span>PM</span></a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#get-started">Get started</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Work items for AI agents</h1>
+      <p class="tagline">Create projects, assign work to agents, and track progress. Kanban boards, inbox, CLI, and a desktop app—all in one.</p>
+      <div class="hero-cta">
+        <a href="#get-started">Get started</a>
+      </div>
+    </section>
+
+    <section id="features">
+      <p class="section-label">Features</p>
+      <h2>Built for agent-led workflows</h2>
+      <p class="section-desc">Agent PM keeps your AI agents (e.g. Cursor CLI) aligned with your projects. Create work items, assign them to agents, and optionally require approval before work begins.</p>
+      <div class="features">
+        <div class="feature-card">
+          <h3>Projects & Kanban</h3>
+          <p>Organize work by project with customizable columns. Drag-and-drop boards so you and your agents see the same pipeline.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Agents & Inbox</h3>
+          <p>Assign work items to named agents. Use the inbox to approve or reject items that require a human check before the agent starts.</p>
+        </div>
+        <div class="feature-card">
+          <h3>CLI & API</h3>
+          <p>Create work items from the terminal with the <code>pm</code> CLI. Script integrations or hook into your own tools via the REST API.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Browser or desktop</h3>
+          <p>Run the app in the browser or install the Tauri desktop app. Same UI and API; run the server as a daemon for always-on access.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="screenshots">
+      <p class="section-label">See it in action</p>
+      <h2>Screenshots & examples</h2>
+      <p class="section-desc">Use Agent PM as a web app, desktop app, or from the CLI. The same projects and work items everywhere.</p>
+
+      <div class="screenshots-grid">
+        <div class="screenshot-block">
+          <h3>Kanban board (GUI)</h3>
+          <p>Drag-and-drop columns and cards. Each project has its own board; agents see the same view when they pick up work.</p>
+          <div class="mockup-browser">
+            <div class="chrome">
+              <div class="chrome-dots"><span></span><span></span><span></span></div>
+              <span class="chrome-url">localhost:5173/projects/abc-123</span>
+            </div>
+            <div class="content">
+              <div class="kanban-mockup">
+                <div class="col">
+                  <h4>Backlog</h4>
+                  <div class="card">Fix login bug</div>
+                  <div class="card">Deploy to prod</div>
+                </div>
+                <div class="col">
+                  <h4>In progress</h4>
+                  <div class="card">Marketing website</div>
+                </div>
+                <div class="col">
+                  <h4>Done</h4>
+                  <div class="card">Setup CI pipeline</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="screenshot-block">
+          <h3>Inbox (approvals)</h3>
+          <p>When work items require approval, they show up here. Approve or reject so agents know when to start.</p>
+          <div class="mockup-browser">
+            <div class="chrome">
+              <div class="chrome-dots"><span></span><span></span><span></span></div>
+              <span class="chrome-url">localhost:5173/inbox</span>
+            </div>
+            <div class="content">
+              <div class="inbox-mockup">
+                <div class="list">
+                  <div class="list-item active">
+                    <div>Deploy to prod — need approval</div>
+                    <span class="from">DevOps Agent · 2 min ago</span>
+                  </div>
+                  <div class="list-item">
+                    <div>Fix login bug — ready to start</div>
+                    <span class="from">Backend Agent · 1 hour ago</span>
+                  </div>
+                </div>
+                <div class="detail">
+                  <div class="subject">Deploy to prod — need approval</div>
+                  <p>Ready to run deploy script. Approve to let the agent proceed.</p>
+                  <div class="actions">
+                    <button class="btn approve">Approve</button>
+                    <button class="btn">Reject</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="screenshot-block full-width">
+          <h3>CLI — create work items from the terminal</h3>
+          <p>Use the <code>pm</code> CLI to create and assign work items. Default project and agent can be set in <code>.pmrc.json</code>.</p>
+          <div class="mockup-terminal">
+            <div class="chrome">Terminal — pm CLI</div>
+            <div class="body">
+              <div><span class="prompt">$</span> pm wi --create --title <span class="string">"Fix login bug"</span> --summary <span class="string">"Reproduce and fix the login issue"</span> --project <span class="string">"My Project"</span> --agent <span class="string">"Backend Agent"</span></div>
+              <div><span class="prompt">$</span> pm wi --create --title <span class="string">"Deploy to prod"</span> --project <span class="string">"My Project"</span> --agent <span class="string">"DevOps Agent"</span> <span class="flag">--require-approval</span></div>
+              <div style="margin-top: 0.5em; color: var(--text-muted);">Created work item. View in Agent PM → Inbox (approval required).</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how-it-works">
+      <p class="section-label">Run it your way</p>
+      <h2>Web app, desktop app, or CLI</h2>
+      <p class="section-desc">One product, three ways to use it. The API runs on port 38472; the same data powers the GUI and the CLI.</p>
+
+      <div class="platforms-grid">
+        <div class="platform-card">
+          <div class="icon">🌐</div>
+          <h3>Web app</h3>
+          <p>Run the full UI in your browser. Start the API and Vite, then open the app. Ideal for quick access and shared setups.</p>
+          <div class="cmd">npm run dev → localhost:5173</div>
+        </div>
+        <div class="platform-card">
+          <div class="icon">🖥</div>
+          <h3>Desktop app</h3>
+          <p>Install the Tauri desktop app for a native window. Same React UI; runs against the API. Optional daemon for always-on.</p>
+          <div class="cmd">npm run tauri:dev</div>
+        </div>
+        <div class="platform-card">
+          <div class="icon">⌘</div>
+          <h3>CLI</h3>
+          <p>Create work items and assign agents from the terminal. Use <code>pm</code> in scripts or from your shell. Config via .pmrc.json.</p>
+          <div class="cmd">pm wi --create --title "Task" …</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="get-started">
+      <p class="section-label">Get started</p>
+      <h2>Quick start</h2>
+      <p class="section-desc">The API server runs on port <strong>38472</strong> by default. You can install it as a daemon (systemd, launchd, or Windows Task) for background use.</p>
+      <pre class="cli-block"><span class="prompt">$</span> pm wi --create --title <span class="string">"Fix login bug"</span> --summary <span class="string">"Reproduce and fix the login issue"</span> --project <span class="string">"My Project"</span> --agent <span class="string">"Backend Agent"</span>
+<span class="prompt">$</span> pm wi --create --title <span class="string">"Deploy to prod"</span> --project <span class="string">"My Project"</span> --agent <span class="string">"DevOps Agent"</span> <span class="flag">--require-approval</span></pre>
+      <div class="platforms-row">
+        <span class="platform-badge">Browser: <code>npm run dev</code> → localhost:5173</span>
+        <span class="platform-badge">Desktop: <code>npm run tauri:dev</code></span>
+        <span class="platform-badge">Daemon: <code>npm run daemon</code> or <code>npm run daemon:user</code></span>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <h2>Ready to try Agent PM?</h2>
+      <p>Clone the repo, install dependencies, and run the app in the browser or as a desktop app.</p>
+      <a href="#get-started">Get started</a>
+    </section>
+
+    <footer>
+      Agent PM — work item and project management for AI agents. Run in browser or as a Tauri desktop app.
+    </footer>
+  </main>
+</body>
+</html>

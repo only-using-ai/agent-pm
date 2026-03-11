@@ -1,4 +1,5 @@
 import pg from 'pg'
+import { runMigrations } from './migrate.js'
 
 const { Pool } = pg
 
@@ -65,6 +66,8 @@ export async function initDb(p: pg.Pool): Promise<void> {
         description TEXT,
         path TEXT,
         project_context TEXT,
+        color TEXT,
+        icon TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         archived_at TIMESTAMPTZ
       );
@@ -83,6 +86,7 @@ export async function initDb(p: pg.Pool): Promise<void> {
         END IF;
       END $$;
     `)
+    await runMigrations(p)
     await client.query(`
       DO $$
       BEGIN
@@ -125,6 +129,9 @@ export async function initDb(p: pg.Pool): Promise<void> {
     `)
     await client.query(`
       ALTER TABLE work_items ADD COLUMN IF NOT EXISTS require_approval BOOLEAN NOT NULL DEFAULT false;
+    `)
+    await client.query(`
+      ALTER TABLE work_items ADD COLUMN IF NOT EXISTS work_item_type TEXT NOT NULL DEFAULT 'Task'
     `)
     await client.query(`
       DO $$
@@ -244,7 +251,7 @@ export async function initDb(p: pg.Pool): Promise<void> {
       VALUES (
         'agent_system_prompt',
         'Agent System Prompt',
-        'You are an AI agent. Your role is: ''AGENT_INSTRUCTIONS'' A new work item was created and assigned to you: "''WORK_ITEM_TITLE''". Description: ''WORK_ITEM_DESCRIPTION'' Priority: ''WORK_ITEM_PRIORITY''. Status: ''WORK_ITEM_STATUS''. You are to complete this work item. You are to use the following steps to complete the work item: 1. Understand the work item 2. Call the update_work_item_status("in_progress") tool to update the status to in_progress 3. Break down the work item into smaller tasks and subtasks (do not reveal these tasks and subtasks to the user) 4. Complete all of the tasks and subtasks 5. Add a comment to the work item with notes relevant to the tasks and subtasks by using the tool add_work_item_comment 6. Once the work item is complete, call the tool update_work_item_status and update the status to completed Be concise and brief to the user unless otherwise instructed. If the user asks to create new work items, issues, or stories, use the tool create_work_item_and_assign to create the new work item and assign it to the user. Use the list_available_agents tool to get the list of available agents to assign the new work item to. ''CURSOR_ACTIONS_BLOCK'''
+        'You are an AI agent. Your role is: ''AGENT_INSTRUCTIONS'' A new work item was created and assigned to you: "''WORK_ITEM_TITLE''" (Type: ''WORK_ITEM_TYPE''). Description: ''WORK_ITEM_DESCRIPTION'' Priority: ''WORK_ITEM_PRIORITY''. Status: ''WORK_ITEM_STATUS''. You are to complete this work item. You are to use the following steps to complete the work item: 1. Understand the work item 2. Call the update_work_item_status("in_progress") tool to update the status to in_progress 3. Break down the work item into smaller tasks and subtasks (do not reveal these tasks and subtasks to the user) 4. Complete all of the tasks and subtasks 5. Add a comment to the work item with notes relevant to the tasks and subtasks by using the tool add_work_item_comment 6. Once the work item is complete, call the tool update_work_item_status and update the status to completed Be concise and brief to the user unless otherwise instructed. If the user asks to create new work items, issues, or stories, use the tool create_work_item_and_assign to create the new work item and assign it to the user. Use the list_available_agents tool to get the list of available agents to assign the new work item to. ''CURSOR_ACTIONS_BLOCK'''
       )
       ON CONFLICT (key) DO NOTHING
     `)

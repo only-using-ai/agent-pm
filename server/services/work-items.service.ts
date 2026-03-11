@@ -16,9 +16,10 @@ import type {
 import { getAssetIdsForWorkItem, setWorkItemAssets } from './assets.service.js'
 
 const WORK_ITEM_COLUMNS =
-  'id, project_id, title, description, assigned_to, priority, depends_on, status, require_approval, archived_at, created_at, updated_at'
+  'id, project_id, title, description, assigned_to, priority, depends_on, status, require_approval, work_item_type, archived_at, created_at, updated_at'
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'] as const
+const WORK_ITEM_TYPES = ['Bug', 'Feature', 'Story', 'Task'] as const
 
 function normalizePriority(priority: unknown): string {
   if (
@@ -35,13 +36,23 @@ function normalizeStatus(status: unknown): string {
   return 'todo'
 }
 
+function normalizeWorkItemType(workItemType: unknown): string {
+  if (
+    typeof workItemType === 'string' &&
+    (WORK_ITEM_TYPES as readonly string[]).includes(workItemType)
+  ) {
+    return workItemType
+  }
+  return 'Task'
+}
+
 export async function listAllWorkItems(
   pool: Pool,
   options: ListOptions = {}
 ): Promise<WorkItemWithProjectRow[]> {
   const whereClause = options.includeArchived ? '' : 'WHERE w.archived_at IS NULL'
   const { rows } = await pool.query(
-    `SELECT w.id, w.project_id, w.title, w.description, w.assigned_to, w.priority, w.depends_on, w.status, w.require_approval, w.archived_at, w.created_at, w.updated_at,
+    `SELECT w.id, w.project_id, w.title, w.description, w.assigned_to, w.priority, w.depends_on, w.status, w.require_approval, w.work_item_type, w.archived_at, w.created_at, w.updated_at,
             p.name AS project_name
      FROM work_items w
      JOIN projects p ON p.id = w.project_id
@@ -64,6 +75,24 @@ export async function listWorkItemsByProject(
     [projectId]
   )
   return rows as WorkItemRow[]
+}
+
+export async function listWorkItemsByAgent(
+  pool: Pool,
+  agentId: string,
+  options: ListOptions = {}
+): Promise<WorkItemWithProjectRow[]> {
+  const archivedClause = options.includeArchived ? '' : 'AND w.archived_at IS NULL'
+  const { rows } = await pool.query(
+    `SELECT w.id, w.project_id, w.title, w.description, w.assigned_to, w.priority, w.depends_on, w.status, w.require_approval, w.work_item_type, w.archived_at, w.created_at, w.updated_at,
+            p.name AS project_name
+     FROM work_items w
+     JOIN projects p ON p.id = w.project_id
+     WHERE w.assigned_to = $1 ${archivedClause}
+     ORDER BY CASE w.status WHEN 'in_progress' THEN 0 WHEN 'todo' THEN 1 ELSE 2 END, w.created_at DESC`,
+    [agentId]
+  )
+  return rows as WorkItemWithProjectRow[]
 }
 
 export async function getWorkItem(
@@ -105,9 +134,10 @@ export async function createWorkItem(
   const priorityVal = normalizePriority(input.priority)
   const statusVal = normalizeStatus(input.status)
   const requireApproval = input.require_approval === true
+  const workItemTypeVal = normalizeWorkItemType(input.work_item_type)
   const { rows } = await pool.query(
-    `INSERT INTO work_items (project_id, title, description, assigned_to, priority, depends_on, status, require_approval)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO work_items (project_id, title, description, assigned_to, priority, depends_on, status, require_approval, work_item_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING ${WORK_ITEM_COLUMNS}`,
     [
       projectId,
@@ -118,6 +148,7 @@ export async function createWorkItem(
       input.depends_on || null,
       statusVal,
       requireApproval,
+      workItemTypeVal,
     ]
   )
   const workItem = rows[0] as WorkItemRow
@@ -171,6 +202,13 @@ export async function updateWorkItem(
   if (input.require_approval !== undefined) {
     updates.push(`require_approval = $${paramIndex++}`)
     values.push(input.require_approval === true)
+  }
+  if (
+    input.work_item_type !== undefined &&
+    (WORK_ITEM_TYPES as readonly string[]).includes(input.work_item_type)
+  ) {
+    updates.push(`work_item_type = $${paramIndex++}`)
+    values.push(input.work_item_type)
   }
 
   if (input.asset_ids !== undefined) {

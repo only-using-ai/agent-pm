@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Circle, ListTodo } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -44,7 +44,14 @@ export function AgentPage() {
   const navigate = useNavigate()
   const { agents, refetch: refetchAgents } = useAgents()
   const archiveAgent = useArchiveAgentMutation()
-  const { subscribe: subscribeToStream, streamContent, streamThinking, clearStream, streamingAgentIds } = useAgentStream()
+  const {
+    subscribe: subscribeToStream,
+    streamContent,
+    streamThinking,
+    clearStream,
+    streamingAgentIds,
+    currentWorkItemIdByAgent,
+  } = useAgentStream()
   const { teams, createTeam } = useTeams()
   const agent = agentId ? agents.find((a) => a.id === agentId) : null
 
@@ -63,6 +70,17 @@ export function AgentPage() {
 
   const [aiProvider, setAiProvider] = useState<string>('ollama')
   const [model, setModel] = useState<string | null>(null)
+
+  type QueueItem = {
+    id: string
+    project_id: string
+    title: string
+    status: string
+    project_name: string
+    priority: string
+  }
+  const [queueWorkItems, setQueueWorkItems] = useState<QueueItem[]>([])
+  const [queueLoading, setQueueLoading] = useState(false)
 
   const { models: providerModels, loading: modelsLoading, error: modelsError } = useProviderModels(aiProvider)
 
@@ -115,10 +133,33 @@ export function AgentPage() {
     return subscribeToStream(agentId)
   }, [agentId, subscribeToStream])
 
+  // Fetch work items queued for this agent
+  useEffect(() => {
+    if (!agentId) return
+    let cancelled = false
+    setQueueLoading(true)
+    setQueueWorkItems([])
+    fetch(`${getApiBase()}/api/agents/${agentId}/work-items`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (!cancelled) setQueueWorkItems(Array.isArray(data) ? data : [])
+      })
+      .catch(() => {
+        if (!cancelled) setQueueWorkItems([])
+      })
+      .finally(() => {
+        if (!cancelled) setQueueLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [agentId])
+
   const selectedTeam = teams.find((t) => t.id === selectedTeamId)
   const isStreaming = agentId ? streamingAgentIds.has(agentId) : false
   const streamText = agentId ? streamContent[agentId] ?? '' : ''
   const streamThinkText = agentId ? streamThinking[agentId] ?? '' : ''
+  const currentWorkItemId = agentId ? currentWorkItemIdByAgent[agentId] : undefined
 
   const handleCreateTeam = async () => {
     if (!newTeamName.trim()) return
@@ -409,7 +450,61 @@ export function AgentPage() {
         onConfirm={handleArchiveConfirm}
       />
         </div>
-        <div className="min-w-0 flex flex-col">
+        <div className="min-w-0 flex flex-col gap-6">
+          {queueWorkItems.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ListTodo className="size-4" />
+                  Queue
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {queueLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading queue…</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {queueWorkItems.map((item) => {
+                      const isWorkingOn =
+                        currentWorkItemId === item.id || item.status === 'in_progress'
+                      return (
+                        <li key={item.id}>
+                          <Link
+                            to={`/projects/${item.project_id}?workItem=${item.id}`}
+                            className={cn(
+                              'flex items-center gap-2 rounded-lg border border-transparent px-3 py-2 text-left text-sm transition-colors',
+                              'hover:border-border hover:bg-muted/50',
+                              isWorkingOn && 'border-primary/50 bg-primary/5'
+                            )}
+                          >
+                            {isWorkingOn ? (
+                              <Circle className="size-2.5 shrink-0 fill-primary text-primary" />
+                            ) : (
+                              <Circle className="size-2.5 shrink-0 text-muted-foreground" />
+                            )}
+                            <span className="min-w-0 flex-1 truncate font-medium">
+                              {item.title}
+                            </span>
+                            {isWorkingOn && (
+                              <span className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                                Working on
+                              </span>
+                            )}
+                            <span className="shrink-0 text-xs text-muted-foreground capitalize">
+                              {item.status.replace('_', ' ')}
+                            </span>
+                          </Link>
+                          <p className="ml-5 mt-0.5 text-xs text-muted-foreground">
+                            {item.project_name}
+                          </p>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
           <Card className="flex flex-1 flex-col min-h-[320px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base">Agent stream</CardTitle>

@@ -9,11 +9,13 @@ import {
   createWorkItem,
   type WorkItemWithProject,
   type WorkItemPriority,
+  type WorkItemType,
   type CreateWorkItemBody,
   type ProjectColumn,
 } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAgents } from '@/contexts/agents-context'
+import { useAgentStream } from '@/contexts/agent-stream-context'
 import { useInbox } from '@/contexts/inbox-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,10 +54,12 @@ const PRIORITY_CLASS: Record<string, string> = {
 }
 
 const PRIORITIES: WorkItemPriority[] = ['Low', 'Medium', 'High', 'Critical']
+const WORK_ITEM_TYPES: WorkItemType[] = ['Bug', 'Feature', 'Story', 'Task']
 
 type CreateForm = {
   project_id: string
   title: string
+  work_item_type: WorkItemType
   description: string
   priority: WorkItemPriority
   assigned_to: string | null
@@ -67,6 +71,7 @@ type CreateForm = {
 const defaultCreateForm: CreateForm = {
   project_id: '',
   title: '',
+  work_item_type: 'Task',
   description: '',
   priority: 'Medium',
   assigned_to: null,
@@ -77,6 +82,7 @@ const defaultCreateForm: CreateForm = {
 
 export function WorkItemsPage() {
   const { agents } = useAgents()
+  const { activeWorkItemIds } = useAgentStream()
   const { refetch: refetchInbox } = useInbox()
   const location = useLocation()
   const navigate = useNavigate()
@@ -160,6 +166,7 @@ export function WorkItemsPage() {
         title: createForm.title.trim(),
         description: createForm.description?.trim() || null,
         priority: createForm.priority,
+        work_item_type: createForm.work_item_type,
         assigned_to: createForm.assigned_to || null,
         depends_on: createForm.depends_on || null,
         status: createForm.status,
@@ -220,6 +227,7 @@ export function WorkItemsPage() {
                   <th className="text-left px-4 py-3 font-medium">Project</th>
                   <th className="text-left px-4 py-3 font-medium">Status</th>
                   <th className="text-left px-4 py-3 font-medium">Priority</th>
+                  <th className="w-20 text-left px-4 py-3 font-medium">Agent</th>
                 </tr>
               </thead>
               <tbody>
@@ -230,7 +238,7 @@ export function WorkItemsPage() {
                   >
                     <td className="px-4 py-3">
                       <Link
-                        to={`/projects/${item.project_id}`}
+                        to={`/projects/${item.project_id}?workItem=${item.id}`}
                         className="font-medium text-foreground hover:underline"
                       >
                         {item.title}
@@ -253,6 +261,17 @@ export function WorkItemsPage() {
                       <span className={cn(PRIORITY_CLASS[item.priority])}>
                         {item.priority}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {activeWorkItemIds.has(item.id) ? (
+                        <span
+                          className="inline-block size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"
+                          title="Agent is working on this item"
+                          aria-label="Agent is working on this item"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -298,19 +317,41 @@ export function WorkItemsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="create-title" className="text-xs font-medium text-muted-foreground">
-                  Summary
-                </Label>
-                <Input
-                  id="create-title"
-                  value={createForm.title}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Enter a short summary"
-                  className="text-base font-medium"
-                  required
-                  autoFocus
-                />
+              <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-title" className="text-xs font-medium text-muted-foreground">
+                    Summary
+                  </Label>
+                  <Input
+                    id="create-title"
+                    value={createForm.title}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="Enter a short summary"
+                    className="text-base font-medium"
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-1.5 min-w-[120px]">
+                  <Label className="text-xs font-medium text-muted-foreground">Type</Label>
+                  <Select
+                    value={createForm.work_item_type}
+                    onValueChange={(v) =>
+                      setCreateForm((f) => ({ ...f, work_item_type: v as WorkItemType }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WORK_ITEM_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="create-description" className="text-xs font-medium text-muted-foreground">

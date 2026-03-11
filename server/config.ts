@@ -100,6 +100,20 @@ export function getCursorApiKey(): string {
   return process.env.CURSOR_API_KEY?.trim() ?? ''
 }
 
+/**
+ * Path to the Cursor CLI binary. Used when running "cursor agent models" (and
+ * for CLI agent runs). Env: CURSOR_CLI_PATH. When unset, on macOS uses the
+ * default app-bundle path so the server finds Cursor even when it's not on PATH.
+ */
+export function getCursorCliPath(): string {
+  const envPath = process.env.CURSOR_CLI_PATH?.trim()
+  if (envPath) return envPath
+  if (process.platform === 'darwin') {
+    return '/Applications/Cursor.app/Contents/Resources/app/bin/cursor'
+  }
+  return 'cursor'
+}
+
 /** Cursor default model for CLI agent runs. Env: CURSOR_MODEL. */
 export function getCursorDefaultModel(): string {
   return process.env.CURSOR_MODEL ?? DEFAULT_CURSOR_MODEL
@@ -149,6 +163,9 @@ export const config = {
   cursor: {
     get apiKey() {
       return getCursorApiKey()
+    },
+    get cliPath() {
+      return getCursorCliPath()
     },
     get defaultModel() {
       return getCursorDefaultModel()

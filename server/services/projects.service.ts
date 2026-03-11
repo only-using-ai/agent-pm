@@ -20,7 +20,7 @@ export async function listProjects(
 ): Promise<ProjectRow[]> {
   const where = options.includeArchived ? '' : 'WHERE archived_at IS NULL'
   const { rows } = await pool.query(
-    `SELECT id, name, priority, description, path, project_context, created_at, archived_at FROM projects ${where} ORDER BY created_at DESC`
+    `SELECT id, name, priority, description, path, project_context, color, icon, created_at, archived_at FROM projects ${where} ORDER BY created_at DESC`
   )
   return rows as ProjectRow[]
 }
@@ -30,7 +30,7 @@ export async function getProjectById(
   id: string
 ): Promise<ProjectRow | null> {
   const { rows } = await pool.query(
-    'SELECT id, name, priority, description, path, project_context, created_at, archived_at FROM projects WHERE id = $1',
+    'SELECT id, name, priority, description, path, project_context, color, icon, created_at, archived_at FROM projects WHERE id = $1',
     [id]
   )
   return (rows[0] as ProjectRow) ?? null
@@ -44,10 +44,10 @@ export async function createProject(
     throw new Error('name is required')
   }
   const { rows } = await pool.query(
-    `INSERT INTO projects (name, priority, description, path, project_context)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, name, priority, description, path, project_context, created_at, archived_at`,
-    [input.name, input.priority ?? null, input.description ?? null, input.path ?? null, input.project_context ?? null]
+    `INSERT INTO projects (name, priority, description, path, project_context, color, icon)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at`,
+    [input.name, input.priority ?? null, input.description ?? null, input.path ?? null, input.project_context ?? null, input.color ?? null, input.icon ?? null]
   )
   const project = rows[0] as ProjectRow
   await ensureDefaultColumns(pool, project.id)
@@ -85,13 +85,21 @@ export async function updateProject(
     updates.push(`project_context = $${paramIndex++}`)
     values.push(input.project_context)
   }
+  if (input.color !== undefined) {
+    updates.push(`color = $${paramIndex++}`)
+    values.push(input.color)
+  }
+  if (input.icon !== undefined) {
+    updates.push(`icon = $${paramIndex++}`)
+    values.push(input.icon)
+  }
   if (updates.length === 0) {
     return getProjectById(pool, id)
   }
   values.push(id)
   const { rows } = await pool.query(
     `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramIndex}
-     RETURNING id, name, priority, description, path, project_context, created_at, archived_at`,
+     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at`,
     values
   )
   return (rows[0] as ProjectRow) ?? null
@@ -103,7 +111,7 @@ export async function archiveProject(
 ): Promise<ProjectRow | null> {
   const { rows } = await pool.query(
     `UPDATE projects SET archived_at = now() WHERE id = $1 AND archived_at IS NULL
-     RETURNING id, name, priority, description, path, project_context, created_at, archived_at`,
+     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at`,
     [id]
   )
   return (rows[0] as ProjectRow) ?? null

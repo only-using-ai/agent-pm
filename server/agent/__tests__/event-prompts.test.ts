@@ -46,6 +46,7 @@ describe('event-prompts', () => {
         priority: 'High',
         status: 'in_progress',
         require_approval: true,
+        work_item_type: 'Bug',
       }
       const vars = getWorkItemCreatedPromptVariables(baseAgent, payload)
       expect(vars.WORK_ITEM_ID).toBe('wi-1')
@@ -53,6 +54,7 @@ describe('event-prompts', () => {
       expect(vars.WORK_ITEM_DESCRIPTION).toBe('Desc')
       expect(vars.WORK_ITEM_PRIORITY).toBe('High')
       expect(vars.WORK_ITEM_STATUS).toBe('in_progress')
+      expect(vars.WORK_ITEM_TYPE).toBe('Bug')
       expect(vars.WORK_ITEM_REQUIRE_APPROVAL).toBe('true')
       expect(vars.PROJECT_ID).toBe('p-1')
       expect(vars.AGENT_INSTRUCTIONS).toBe('Help.')
@@ -74,6 +76,7 @@ describe('event-prompts', () => {
       expect(vars.WORK_ITEM_DESCRIPTION).toBe('None')
       expect(vars.WORK_ITEM_PRIORITY).toBe('Medium')
       expect(vars.WORK_ITEM_STATUS).toBe('todo')
+      expect(vars.WORK_ITEM_TYPE).toBe('Task')
       expect(vars.WORK_ITEM_REQUIRE_APPROVAL).toBe('false')
     })
 

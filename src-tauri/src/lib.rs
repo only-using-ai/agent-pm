@@ -136,12 +136,25 @@ pub fn run() {
       let app_submenu = SubmenuBuilder::new(app.handle(), "Agent PM")
         .quit()
         .build()?;
+      let copy_item =
+        MenuItemBuilder::with_id("edit-copy", "Copy").accelerator("CmdOrControl+C").build(app.handle())?;
+      let cut_item =
+        MenuItemBuilder::with_id("edit-cut", "Cut").accelerator("CmdOrControl+X").build(app.handle())?;
+      let paste_item =
+        MenuItemBuilder::with_id("edit-paste", "Paste").accelerator("CmdOrControl+V").build(app.handle())?;
+      let edit_submenu =
+        SubmenuBuilder::new(app.handle(), "Edit")
+          .item(&copy_item)
+          .item(&cut_item)
+          .item(&paste_item)
+          .build()?;
       let refresh =
         MenuItemBuilder::with_id("refresh-app", "Refresh App").build(app.handle())?;
       let window_submenu =
         SubmenuBuilder::new(app.handle(), "Window").item(&refresh).build()?;
       let menu = MenuBuilder::new(app.handle())
         .item(&app_submenu)
+        .item(&edit_submenu)
         .item(&window_submenu)
         .item(&help_submenu)
         .build()?;
@@ -164,11 +177,24 @@ pub fn run() {
       Ok(())
     })
     .on_menu_event(|app, event| {
-      if event.id().as_ref() == "refresh-app" {
+      let id = event.id().as_ref();
+      if id == "refresh-app" {
         if let Some(w) = app.get_webview_window("main") {
           let _ = w.eval("window.location.reload()");
         }
-      } else if event.id().as_ref() == "log-to-file" {
+      } else if id == "edit-copy" {
+        if let Some(w) = app.get_webview_window("main") {
+          let _ = w.eval("document.execCommand('copy')");
+        }
+      } else if id == "edit-cut" {
+        if let Some(w) = app.get_webview_window("main") {
+          let _ = w.eval("document.execCommand('cut')");
+        }
+      } else if id == "edit-paste" {
+        if let Some(w) = app.get_webview_window("main") {
+          let _ = w.eval("document.execCommand('paste')");
+        }
+      } else if id == "log-to-file" {
         let current = read_log_to_file(app);
         let next = !current;
         if write_log_to_file_setting(app, next).is_ok() {

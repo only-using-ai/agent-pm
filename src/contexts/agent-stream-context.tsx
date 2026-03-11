@@ -30,6 +30,10 @@ export type AgentActionEntry = {
 interface AgentStreamContextValue {
   /** Agent IDs that are currently streaming */
   streamingAgentIds: Set<string>
+  /** Work item IDs that currently have an agent actively working on them */
+  activeWorkItemIds: Set<string>
+  /** For each agent ID, the work item ID they are currently working on (from stream_start). */
+  currentWorkItemIdByAgent: Record<string, string>
   /** Accumulated stream text per agent (latest run) */
   streamContent: Record<string, string>
   /** Accumulated model thinking/reasoning per agent (latest run) */
@@ -48,6 +52,10 @@ const AgentStreamContext = createContext<AgentStreamContextValue | null>(null)
 
 export function AgentStreamProvider({ children }: { children: ReactNode }) {
   const [streamingAgentIds, setStreamingAgentIds] = useState<Set<string>>(new Set())
+  const [activeWorkItemIds, setActiveWorkItemIds] = useState<Set<string>>(new Set())
+  const [currentWorkItemIdByAgent, setCurrentWorkItemIdByAgent] = useState<
+    Record<string, string>
+  >({})
   const [streamContent, setStreamContent] = useState<Record<string, string>>({})
   const [streamThinking, setStreamThinking] = useState<Record<string, string>>({})
   const [lastWorkItemStatusUpdate, setLastWorkItemStatusUpdate] =
@@ -57,6 +65,7 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
   const streamStatusRef = useRef<EventSource | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
   const subscribedAgentIdRef = useRef<string | null>(null)
+  const agentIdToWorkItemIdRef = useRef<Map<string, string>>(new Map())
 
   // Global stream status (start/end) so sidebar can show green indicator for any agent
   useEffect(() => {
@@ -92,10 +101,28 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
           if (event === 'stream_start') {
             setStreamingAgentIds((prev) => new Set(prev).add(agentId))
             setAgentActions((prev) => ({ ...prev, [agentId]: [] }))
+            const workItemId = data?.work_item_id
+            if (typeof workItemId === 'string' && workItemId) {
+              agentIdToWorkItemIdRef.current = new Map(agentIdToWorkItemIdRef.current).set(
+                agentId,
+                workItemId
+              )
+              setActiveWorkItemIds(new Set(agentIdToWorkItemIdRef.current.values()))
+              setCurrentWorkItemIdByAgent((prev) => ({ ...prev, [agentId]: workItemId }))
+            }
           } else if (event === 'stream_end' || event === 'stream_error') {
             setStreamingAgentIds((prev) => {
               const next = new Set(prev)
               next.delete(agentId)
+              return next
+            })
+            const nextMap = new Map(agentIdToWorkItemIdRef.current)
+            nextMap.delete(agentId)
+            agentIdToWorkItemIdRef.current = nextMap
+            setActiveWorkItemIds(new Set(nextMap.values()))
+            setCurrentWorkItemIdByAgent((prev) => {
+              const next = { ...prev }
+              delete next[agentId]
               return next
             })
           }
@@ -187,6 +214,8 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
 
   const value: AgentStreamContextValue = {
     streamingAgentIds,
+    activeWorkItemIds,
+    currentWorkItemIdByAgent,
     streamContent,
     streamThinking,
     lastWorkItemStatusUpdate,

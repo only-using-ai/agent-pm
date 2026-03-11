@@ -6,6 +6,7 @@ import {
   updateAgent,
   archiveAgent,
 } from '../services/agents.service.js'
+import { listWorkItemsByAgent } from '../services/work-items.service.js'
 import { fetchOllamaModels } from '../services/ollama.service.js'
 import { fetchCursorModels } from '../services/cursor.service.js'
 import { fetchAnthropicModels } from '../services/anthropic.service.js'
@@ -60,6 +61,18 @@ export function createAgentsRouter(deps: RouteDeps): Router {
       const row = await getAgentById(pool(), req.params.id)
       if (!row) throw notFound('Agent not found')
       res.json(row)
+    })
+  )
+
+  router.get(
+    '/:id/work-items',
+    validateParams(paramId),
+    asyncHandler(async (req, res) => {
+      const agentId = req.params.id
+      const agent = await getAgentById(pool(), agentId)
+      if (!agent) throw notFound('Agent not found')
+      const rows = await listWorkItemsByAgent(pool(), agentId)
+      res.json(rows)
     })
   )
 

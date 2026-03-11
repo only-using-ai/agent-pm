@@ -48,10 +48,13 @@ import {
   type WorkItemWithComments,
   type WorkItemComment,
   type WorkItemPriority,
+  type WorkItemType,
   type CreateWorkItemBody,
   type ProjectColumn,
   type Asset,
 } from '@/lib/api'
+
+const WORK_ITEM_TYPES: WorkItemType[] = ['Bug', 'Feature', 'Story', 'Task']
 
 const COLOR_OPTIONS = [
   { value: 'bg-muted/50', label: 'Gray' },
@@ -77,10 +80,12 @@ function KanbanCard({
   item,
   isDragging,
   onClick,
+  isAgentActive,
 }: {
   item: KanbanItem
   isDragging?: boolean
   onClick?: () => void
+  isAgentActive?: boolean
 }) {
   return (
     <div
@@ -101,7 +106,16 @@ function KanbanCard({
         isDragging && 'opacity-90 shadow-md ring-2 ring-primary'
       )}
     >
-      {item.title}
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="truncate flex-1">{item.title}</span>
+        {isAgentActive && (
+          <span
+            className="shrink-0 size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"
+            title="Agent is working on this item"
+            aria-label="Agent is working on this item"
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -123,6 +137,7 @@ function DroppableColumn({
   isColumnDragActive,
   onColumnDragOver,
   onColumnDragLeave,
+  activeWorkItemIds,
 }: {
   column: KanbanColumn
   items: KanbanItem[]
@@ -140,6 +155,7 @@ function DroppableColumn({
   isColumnDragActive?: boolean
   onColumnDragOver?: () => void
   onColumnDragLeave?: () => void
+  activeWorkItemIds?: Set<string>
 }) {
   const [isOver, setIsOver] = useState(false)
   const [showActions, setShowActions] = useState(false)
@@ -238,23 +254,30 @@ function DroppableColumn({
       </div>
       <div className="flex flex-1 flex-col gap-2">
         {items.map((item) => (
-          <div
-            key={item.id}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData('application/x-kanban-item', item.id)
-              e.dataTransfer.effectAllowed = 'move'
-              onDragStartItem?.()
-            }}
-            onDragEnd={() => onDragEndItem?.()}
-            className="cursor-grab active:cursor-grabbing"
-          >
-            <KanbanCard
-              item={item}
-              onClick={() => {
-                if (onItemClick) onItemClick(item.id)
+          <div key={item.id} className="flex items-stretch gap-0 rounded-lg overflow-hidden border border-transparent hover:border-border/50">
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/x-kanban-item', item.id)
+                e.dataTransfer.effectAllowed = 'move'
+                onDragStartItem?.()
               }}
-            />
+              onDragEnd={() => onDragEndItem?.()}
+              onClick={(e) => e.stopPropagation()}
+              className="cursor-grab active:cursor-grabbing touch-none shrink-0 flex items-center pl-1 pr-0.5 text-muted-foreground hover:text-foreground"
+              aria-label="Drag to move"
+            >
+              <GripVertical className="size-3.5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <KanbanCard
+                item={item}
+                onClick={() => {
+                  if (onItemClick) onItemClick(item.id)
+                }}
+                isAgentActive={activeWorkItemIds?.has(item.id)}
+              />
+            </div>
           </div>
         ))}
         {onAddItem && (
@@ -289,7 +312,7 @@ export function ProjectPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { projects } = useProjects()
   const { agents } = useAgents()
-  const { lastWorkItemStatusUpdate } = useAgentStream()
+  const { activeWorkItemIds, lastWorkItemStatusUpdate } = useAgentStream()
   const { refetch: refetchInbox } = useInbox()
   const [columns, setColumns] = useState<KanbanColumn[]>([])
   const [columnsLoading, setColumnsLoading] = useState(true)
@@ -310,6 +333,7 @@ export function ProjectPage() {
     title: '',
     description: '',
     priority: 'Medium',
+    work_item_type: 'Task',
     assigned_to: null,
     depends_on: null,
     status: 'todo',
@@ -323,6 +347,7 @@ export function ProjectPage() {
     title: '',
     description: '',
     priority: 'Medium',
+    work_item_type: 'Task',
     assigned_to: null,
     depends_on: null,
     status: 'todo',
@@ -413,6 +438,7 @@ export function ProjectPage() {
       setWorkItems((prevItems) =>
         prevItems.map((w) => (w.id === itemId ? { ...w, status: newStatus } : w))
       )
+      dragInProgressRef.current = false
       try {
         await updateWorkItem(projectId, itemId, { status: newStatus })
       } catch {
@@ -497,6 +523,7 @@ export function ProjectPage() {
       title: '',
       description: '',
       priority: 'Medium',
+      work_item_type: 'Task',
       assigned_to: null,
       depends_on: null,
       status: todoColumnId,
@@ -511,6 +538,7 @@ export function ProjectPage() {
         title: '',
         description: '',
         priority: 'Medium',
+        work_item_type: 'Task',
         assigned_to: null,
         depends_on: null,
         status: columnId,
@@ -530,6 +558,7 @@ export function ProjectPage() {
         title: createForm.title.trim(),
         description: createForm.description?.trim() || null,
         priority: createForm.priority,
+        work_item_type: createForm.work_item_type ?? 'Task',
         assigned_to: createForm.assigned_to || null,
         depends_on: createForm.depends_on || null,
         status: createForm.status,
@@ -559,6 +588,7 @@ export function ProjectPage() {
           title: data.title,
           description: data.description ?? '',
           priority: data.priority,
+          work_item_type: (data as WorkItem).work_item_type ?? 'Task',
           assigned_to: data.assigned_to ?? null,
           depends_on: data.depends_on ?? null,
           status: data.status,
@@ -603,6 +633,7 @@ export function ProjectPage() {
         title: editForm.title.trim(),
         description: editForm.description?.trim() || null,
         priority: editForm.priority,
+        work_item_type: editForm.work_item_type ?? 'Task',
         assigned_to: editForm.assigned_to || null,
         depends_on: editForm.depends_on || null,
         status: editForm.status,
@@ -866,6 +897,7 @@ export function ProjectPage() {
                   setColumnDragId(null)
                   setColumnDropTargetId(null)
                 }}
+                activeWorkItemIds={activeWorkItemIds}
                 headerLeft={
                   <div
                     draggable
@@ -954,19 +986,41 @@ export function ProjectPage() {
                 submitCreateWorkItem()
               }}
             >
-              <div className="space-y-1.5">
-                <Label htmlFor="create-title" className="text-xs font-medium text-muted-foreground">
-                  Summary
-                </Label>
-                <Input
-                  id="create-title"
-                  value={createForm.title}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Enter a short summary"
-                  className="text-base font-medium"
-                  required
-                  autoFocus
-                />
+              <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-title" className="text-xs font-medium text-muted-foreground">
+                    Summary
+                  </Label>
+                  <Input
+                    id="create-title"
+                    value={createForm.title}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="Enter a short summary"
+                    className="text-base font-medium"
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-1.5 min-w-[120px]">
+                  <Label className="text-xs font-medium text-muted-foreground">Type</Label>
+                  <Select
+                    value={createForm.work_item_type ?? 'Task'}
+                    onValueChange={(v) =>
+                      setCreateForm((f) => ({ ...f, work_item_type: v as WorkItemType }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WORK_ITEM_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="create-description" className="text-xs font-medium text-muted-foreground">
@@ -1168,6 +1222,15 @@ export function ProjectPage() {
             <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Edit issue
             </div>
+            {editingWorkItemId && activeWorkItemIds.has(editingWorkItemId) && (
+              <div className="mb-3 flex items-center gap-2">
+                <span
+                  className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"
+                  title="An agent is currently working on this item"
+                  aria-label="An agent is currently working on this item"
+                />
+              </div>
+            )}
             <DialogTitle className="sr-only">Edit Work Item</DialogTitle>
             {!editingWorkItem ? (
               <div className="py-8 text-center text-muted-foreground">Loading…</div>
@@ -1175,17 +1238,39 @@ export function ProjectPage() {
               <div className="flex flex-1 min-h-0 gap-4 mt-3">
                 {/* Left: issue form */}
                 <div className="flex-1 flex flex-col gap-4 overflow-y-auto min-w-0">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="edit-title" className="text-xs font-medium text-muted-foreground">
-                      Summary
-                    </Label>
-                    <Input
-                      id="edit-title"
-                      value={editForm.title}
-                      onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
-                      placeholder="Enter a short summary"
-                      className="text-base font-medium"
-                    />
+                  <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-title" className="text-xs font-medium text-muted-foreground">
+                        Summary
+                      </Label>
+                      <Input
+                        id="edit-title"
+                        value={editForm.title}
+                        onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                        placeholder="Enter a short summary"
+                        className="text-base font-medium"
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-[120px]">
+                      <Label className="text-xs font-medium text-muted-foreground">Type</Label>
+                      <Select
+                        value={editForm.work_item_type ?? 'Task'}
+                        onValueChange={(v) =>
+                          setEditForm((f) => ({ ...f, work_item_type: v as WorkItemType }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WORK_ITEM_TYPES.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="edit-description" className="text-xs font-medium text-muted-foreground">

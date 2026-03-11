@@ -15,9 +15,7 @@
 import { spawn } from 'node:child_process'
 import type { StreamChunk, ChatMessage } from './types.js'
 import type { WorkItemToolContext } from './langchain-tools.js'
-import { getCursorDefaultModel } from '../config.js'
-
-const CURSOR_CLI = 'cursor'
+import { getCursorCliPath, getCursorDefaultModel } from '../config.js'
 
 const AGENT_ACTION_REGEX = /^__AGENT_ACTION__\s+(\w+)\s+(.+)$/
 const WORK_ITEM_STATUS_VALUES = ['todo', 'in_progress', 'completed', 'blocked', 'canceled'] as const
@@ -393,7 +391,7 @@ export async function* runCursorCLIStream(
   if (workspace) {
     spawnOpts.cwd = workspace
   }
-  const proc = spawn(CURSOR_CLI, args, spawnOpts)
+  const proc = spawn(getCursorCliPath(), args, spawnOpts)
 
   let buffer = ''
   const stdout = proc.stdout
@@ -560,7 +558,7 @@ export async function runCursorCLI(
   }
   let stdout = ''
   try {
-    const result = await execFileAsync(CURSOR_CLI, args, execOpts)
+    const result = await execFileAsync(getCursorCliPath(), args, execOpts)
     stdout = (result as { stdout: string }).stdout
   } catch (err: unknown) {
     const e = err as NodeJS.ErrnoException & { stdout?: string }

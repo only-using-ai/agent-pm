@@ -8,6 +8,7 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:frontend": "vite",
     "desktop": "npm run tauri:build",
+    "setup": "npm install && npm run daemon:user -- --user && npm run desktop",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

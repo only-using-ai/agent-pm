@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +35,7 @@ function getInitials(profile: Profile | null): string {
 
 export function TopNav() {
   const { isDark, setTheme } = useTheme()
+  const { state: sidebarState } = useSidebar()
   const navigate = useNavigate()
   const [commandOpen, setCommandOpen] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -62,7 +63,12 @@ export function TopNav() {
   return (
     <div className="contents">
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
-      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+      <header
+        className={cn(
+          'fixed top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 right-0',
+          sidebarState === 'collapsed' ? 'left-[var(--sidebar-width-icon)]' : 'left-[var(--sidebar-width)]'
+        )}
+      >
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="h-6" />
         <img src="/logo.svg" alt="Agent PM" className="h-8 w-8 shrink-0" />

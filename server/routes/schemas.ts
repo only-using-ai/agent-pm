@@ -92,6 +92,8 @@ export const createProjectBody = z.object({
   description: optionalString,
   path: optionalString,
   project_context: optionalString,
+  color: optionalString,
+  icon: optionalString,
 })
 
 export const updateProjectBody = z.object({
@@ -100,6 +102,8 @@ export const updateProjectBody = z.object({
   description: optionalString,
   path: optionalString,
   project_context: optionalString,
+  color: optionalString,
+  icon: optionalString,
 })
 
 // --- Columns ---
@@ -116,6 +120,7 @@ export const updateColumnBody = z.object({
 
 // --- Work items ---
 const workItemAssetIds = z.array(z.string()).optional()
+const workItemType = z.enum(['Bug', 'Feature', 'Story', 'Task'])
 
 export const createWorkItemBody = z.object({
   title: nonEmptyString,
@@ -125,6 +130,7 @@ export const createWorkItemBody = z.object({
   depends_on: optionalString,
   status: z.string().optional(),
   require_approval: z.boolean().optional(),
+  work_item_type: workItemType.optional(),
   asset_ids: workItemAssetIds,
 })
 
@@ -137,6 +143,7 @@ export const updateWorkItemBody = z
     depends_on: optionalString,
     status: z.string().optional(),
     require_approval: z.boolean().optional(),
+    work_item_type: workItemType.optional(),
     asset_ids: z.array(z.string()).optional(),
   })
   .refine((data) => Object.values(data).some((v) => v !== undefined), {

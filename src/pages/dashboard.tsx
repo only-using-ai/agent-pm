@@ -37,7 +37,7 @@ export function DashboardPage() {
   const { data: inboxItems = [], isLoading: inboxLoading } = useInboxQuery()
   const approveInbox = useApproveInboxItemMutation()
   const rejectInbox = useRejectInboxItemMutation()
-  const { streamingAgentIds } = useAgentStream()
+  const { activeWorkItemIds, streamingAgentIds } = useAgentStream()
   const { projects, loading: projectsLoading } = useProjects()
   const [workItems, setWorkItems] = useState<WorkItemWithProject[]>([])
   const [workItemsLoading, setWorkItemsLoading] = useState(true)
@@ -85,6 +85,7 @@ export function DashboardPage() {
   const inProgressCount = workItems.filter((i) => i.status === 'in_progress').length
   const totalWorkItems = workItems.length
   const liveAgents = agents.filter((a) => streamingAgentIds.has(a.id))
+  const workItemsBeingWorkedOn = workItems.filter((w) => activeWorkItemIds.has(w.id))
   const loading = agentsLoading || projectsLoading || workItemsLoading
   const approvalCardLoading = inboxLoading
 
@@ -262,6 +263,48 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Work items being worked on by agents */}
+      {workItemsBeingWorkedOn.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <span
+                className={cn(
+                  'inline-flex size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse'
+                )}
+                aria-hidden
+              />
+              Being worked on by agent
+            </CardTitle>
+            <CardDescription>
+              Work items that an agent is actively working on.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {workItemsBeingWorkedOn.map((w) => (
+                <li key={w.id}>
+                  <Link
+                    to={`/projects/${w.project_id}?workItem=${w.id}`}
+                    className="flex items-center gap-2 rounded-md p-2 text-sm transition-colors hover:bg-muted"
+                  >
+                    <span
+                      className={cn(
+                        'shrink-0 size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse'
+                      )}
+                    />
+                    <span className="font-medium truncate">{w.title}</span>
+                    <span className="text-muted-foreground truncate text-xs">
+                      {projects.find((p) => p.id === w.project_id)?.name ?? w.project_id}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Live agents card */}
       <Card>

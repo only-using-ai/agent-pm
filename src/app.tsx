@@ -13,7 +13,6 @@ import { ProjectsProvider } from '@/contexts/projects-context'
 import { AddAgentPage } from '@/pages/add-agent'
 import { AgentPage } from '@/pages/agent'
 import { AssetsPage } from '@/pages/assets'
-import { ContextPage } from '@/pages/context'
 import { DashboardPage } from '@/pages/dashboard'
 import { InboxPage } from '@/pages/inbox'
 import { AddMcpPage } from '@/pages/add-mcp'
@@ -42,12 +41,11 @@ function App() {
           <AppSidebar />
           <SidebarInset>
         <TopNav />
-        <main className="flex-1 p-6">
+        <main className="flex-1 flex flex-col min-h-0 pt-14 p-6">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/work-items" element={<WorkItemsPage />} />
             <Route path="/assets" element={<AssetsPage />} />
-            <Route path="/context" element={<ContextPage />} />
             <Route path="/inbox" element={<InboxPage />} />
             <Route path="/agents/new" element={<AddAgentPage />} />
             <Route path="/agents/:agentId" element={<AgentPage />} />

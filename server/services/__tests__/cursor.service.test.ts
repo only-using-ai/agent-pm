@@ -1,19 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fetchCursorModelsFromApi, fetchCursorModels } from '../cursor.service.js'
-import { exec } from 'node:child_process'
+import { execFile } from 'node:child_process'
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockExec = vi.fn((cmd: string, opts: any, cb?: (err: Error | null, stdout: string, stderr: string) => void) => {
+  const mockExecFile = vi.fn((bin: string, args: string[], opts: any, cb?: (err: Error | null, stdout: string, stderr: string) => void) => {
     const callback = (typeof opts === 'function' ? opts : cb) as ((err: Error | null, stdout: string, stderr: string) => void) | undefined
     if (callback) callback(null, 'model-id - Display Name\n', '')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return {} as any
   })
-  const mock = { ...actual, exec: mockExec }
+  const mock = { ...actual, execFile: mockExecFile }
   return { ...mock, default: mock }
 })
+
+vi.mock('../../config.js', () => ({
+  getCursorApiKey: () => process.env.CURSOR_API_KEY ?? '',
+  getCursorCliPath: () => 'cursor',
+}))
 
 describe('cursor.service', () => {
   const originalFetch = globalThis.fetch
@@ -74,7 +79,7 @@ describe('cursor.service', () => {
       } as unknown as Response)
       const result = await fetchCursorModels('key')
       expect(result).toEqual({ ok: true, models: ['model-1'] })
-      expect(exec).not.toHaveBeenCalled()
+      expect(execFile).not.toHaveBeenCalled()
     })
 
     it('falls back to CLI when API returns empty', async () => {
@@ -84,13 +89,13 @@ describe('cursor.service', () => {
         text: () => Promise.resolve(''),
       } as unknown as Response)
       const result = await fetchCursorModels('key')
-      expect(exec).toHaveBeenCalledWith('cursor agent models', expect.any(Object), expect.any(Function))
+      expect(execFile).toHaveBeenCalledWith('cursor', ['agent', 'models'], expect.any(Object), expect.any(Function))
       if (result.ok) expect(result.models).toBeDefined()
     })
 
     it('uses CLI when no apiKey', async () => {
       const result = await fetchCursorModels()
-      expect(exec).toHaveBeenCalledWith('cursor agent models', expect.any(Object), expect.any(Function))
+      expect(execFile).toHaveBeenCalledWith('cursor', ['agent', 'models'], expect.any(Object), expect.any(Function))
       expect(result.ok).toBe(true)
       expect(Array.isArray(result.models)).toBe(true)
     })

@@ -30,7 +30,7 @@ describe('work-items routes (GET /api/work-items)', () => {
   })
 
   it('returns list of all work items', async () => {
-    const rows = [{ id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }]
+    const rows = [{ id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }]
     vi.mocked(workItemsService.listAllWorkItems).mockResolvedValue(rows)
     const deps = { getPool: createMockGetPool(pool), sse: { broadcastToAgent: () => {}, registerAgentStream: () => {}, registerStreamStatus: () => {} }, emit: createMockEmit(), upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() } }
     const router = createWorkItemsRouter(deps)
@@ -68,7 +68,7 @@ describe('project work-items routes', () => {
 
   describe('GET /', () => {
     it('returns list of work items for project', async () => {
-      const rows = [{ id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }]
+      const rows = [{ id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }]
       vi.mocked(workItemsService.listWorkItemsByProject).mockResolvedValue(rows)
       const router = createProjectWorkItemsRouter(deps())
       const app = appWithRouter('/api/projects/:projectId/work-items', router)
@@ -80,7 +80,7 @@ describe('project work-items routes', () => {
 
   describe('GET /:id', () => {
     it('returns work item when found', async () => {
-      const row = { id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }
+      const row = { id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }
       vi.mocked(workItemsService.getWorkItem).mockResolvedValue(row)
       const router = createProjectWorkItemsRouter(deps())
       const app = appWithRouter('/api/projects/:projectId/work-items', router)
@@ -100,7 +100,7 @@ describe('project work-items routes', () => {
 
   describe('POST /', () => {
     it('creates work item and returns 201', async () => {
-      const row = { id: 'w1', project_id: 'p1', title: 'New', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }
+      const row = { id: 'w1', project_id: 'p1', title: 'New', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }
       vi.mocked(workItemsService.createWorkItem).mockResolvedValue(row)
       const emit = vi.fn()
       const router = createProjectWorkItemsRouter({ ...deps(), emit })
@@ -121,7 +121,7 @@ describe('project work-items routes', () => {
 
   describe('PATCH /:id', () => {
     it('updates work item and returns 200', async () => {
-      const row = { id: 'w1', project_id: 'p1', title: 'Updated', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'done', require_approval: false, archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }
+      const row = { id: 'w1', project_id: 'p1', title: 'Updated', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'done', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }
       vi.mocked(workItemsService.updateWorkItem).mockResolvedValue(row)
       const router = createProjectWorkItemsRouter(deps())
       const app = appWithRouter('/api/projects/:projectId/work-items', router)
@@ -148,7 +148,7 @@ describe('project work-items routes', () => {
 
   describe('PATCH /:id/archive', () => {
     it('archives work item and returns 200', async () => {
-      const row = { id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, archived_at: '2025-01-02', created_at: '2025-01-01', updated_at: '2025-01-01' }
+      const row = { id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: '2025-01-02', created_at: '2025-01-01', updated_at: '2025-01-01' }
       vi.mocked(workItemsService.archiveWorkItem).mockResolvedValue(row)
       const router = createProjectWorkItemsRouter(deps())
       const app = appWithRouter('/api/projects/:projectId/work-items', router)

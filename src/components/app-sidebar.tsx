@@ -20,7 +20,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import {
   Bot,
   ChevronDown,
-  FileText,
   FolderKanban,
   FolderTree,
   Inbox,
@@ -106,18 +105,6 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* Context – direct link */}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip="Context"
-                  render={<Link to="/context" />}
-                  isActive={location.pathname === '/context'}
-                >
-                  <FileText className="size-4" />
-                  <span>Context</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
               {/* Assets – direct link */}
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -187,7 +174,21 @@ export function AppSidebar() {
                                 render={<Link to={`/projects/${project.id}`} />}
                                 className="flex-1 min-w-0"
                               >
-                                {project.name}
+                                <span className="flex items-center gap-2 min-w-0">
+                                  {project.color && (
+                                    <span
+                                      className="size-2.5 shrink-0 rounded-sm"
+                                      style={{ backgroundColor: project.color }}
+                                      aria-hidden
+                                    />
+                                  )}
+                                  {project.icon && (
+                                    <span className="shrink-0 text-base leading-none" aria-hidden>
+                                      {project.icon}
+                                    </span>
+                                  )}
+                                  <span className="truncate">{project.name}</span>
+                                </span>
                               </SidebarMenuSubButton>
                               <Link
                                 to={`/projects/${project.id}/settings`}

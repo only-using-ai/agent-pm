@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 import {
   listAllWorkItems,
   listWorkItemsByProject,
+  listWorkItemsByAgent,
   getWorkItem,
   createWorkItem,
   updateWorkItem,
@@ -34,6 +35,7 @@ describe('work-items.service', () => {
     depends_on: null,
     status: 'todo',
     require_approval: false,
+    work_item_type: 'Task',
     archived_at: null,
     created_at: '2025-01-01',
     updated_at: '2025-01-01',
@@ -59,6 +61,25 @@ describe('work-items.service', () => {
       mockQuery.mockResolvedValue({ rows: [workItemRow] })
       const result = await listWorkItemsByProject(pool, 'p1')
       expect(result).toEqual([workItemRow])
+    })
+  })
+
+  describe('listWorkItemsByAgent', () => {
+    it('returns work items assigned to agent with project name', async () => {
+      const rows: WorkItemWithProjectRow[] = [
+        { ...workItemRow, assigned_to: 'agent-1', project_name: 'P1' },
+      ]
+      mockQuery.mockResolvedValue({ rows })
+      const result = await listWorkItemsByAgent(pool, 'agent-1')
+      expect(result).toEqual(rows)
+      expect(mockQuery.mock.calls[0][0]).toContain('assigned_to = $1')
+      expect(mockQuery.mock.calls[0][1]).toEqual(['agent-1'])
+    })
+
+    it('excludes archived by default', async () => {
+      mockQuery.mockResolvedValue({ rows: [] })
+      await listWorkItemsByAgent(pool, 'agent-1')
+      expect(mockQuery.mock.calls[0][0]).toContain('archived_at IS NULL')
     })
   })
 

@@ -102,6 +102,7 @@ export function createProjectWorkItemsRouter(deps: RouteDeps): Router {
         ...(req.body.depends_on !== undefined && { depends_on: req.body.depends_on }),
         ...(req.body.status !== undefined && { status: req.body.status }),
         ...(req.body.require_approval !== undefined && { require_approval: req.body.require_approval }),
+        ...(req.body.work_item_type !== undefined && { work_item_type: req.body.work_item_type }),
         ...(req.body.asset_ids !== undefined && { asset_ids: req.body.asset_ids }),
       }
       const row = await updateWorkItem(pool(), projectId, id, updates)

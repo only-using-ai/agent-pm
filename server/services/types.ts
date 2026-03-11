@@ -42,6 +42,8 @@ export type ProjectRow = {
   description: string | null
   path: string | null
   project_context: string | null
+  color: string | null
+  icon: string | null
   created_at: string
   archived_at: string | null
 }
@@ -52,6 +54,8 @@ export type CreateProjectInput = {
   description?: string | null
   path?: string | null
   project_context?: string | null
+  color?: string | null
+  icon?: string | null
 }
 
 export type UpdateProjectInput = {
@@ -60,6 +64,8 @@ export type UpdateProjectInput = {
   description?: string | null
   path?: string | null
   project_context?: string | null
+  color?: string | null
+  icon?: string | null
 }
 
 export type ProjectColumnRow = {
@@ -81,6 +87,8 @@ export type UpdateProjectColumnInput = {
   position?: number
 }
 
+export type WorkItemType = 'Bug' | 'Feature' | 'Story' | 'Task'
+
 export type WorkItemRow = {
   id: string
   project_id: string
@@ -91,6 +99,7 @@ export type WorkItemRow = {
   depends_on: string | null
   status: string
   require_approval: boolean
+  work_item_type: string
   archived_at: string | null
   created_at: string
   updated_at: string
@@ -121,6 +130,7 @@ export type CreateWorkItemInput = {
   depends_on?: string | null
   status?: string
   require_approval?: boolean
+  work_item_type?: WorkItemType
   asset_ids?: string[]
 }
 
@@ -132,6 +142,7 @@ export type UpdateWorkItemInput = Partial<{
   depends_on: string | null
   status: string
   require_approval: boolean
+  work_item_type: WorkItemType
   asset_ids: string[]
 }>
 

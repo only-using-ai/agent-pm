@@ -16,6 +16,7 @@ export interface WorkItemCreatedPayload {
   assigned_to?: string | null
   depends_on?: string | null
   require_approval?: boolean
+  work_item_type?: string | null
   [key: string]: unknown
 }
 
@@ -27,6 +28,7 @@ export interface WorkItemWithCommentsForPrompt {
   description?: string | null
   priority?: string | null
   status?: string | null
+  work_item_type?: string | null
   comments: Array<{
     author_type: string
     author_id: string | null
@@ -43,6 +45,7 @@ export interface WorkItemAssignmentChangePayload {
   description?: string | null
   priority?: string | null
   status?: string | null
+  work_item_type?: string | null
   assigned_to?: string | null
   depends_on?: string | null
   require_approval?: boolean
@@ -91,6 +94,7 @@ export function getWorkItemCreatedPromptVariables(
     WORK_ITEM_DESCRIPTION: payload.description?.trim() || 'None',
     WORK_ITEM_PRIORITY: payload.priority ?? 'Medium',
     WORK_ITEM_STATUS: payload.status ?? 'todo',
+    WORK_ITEM_TYPE: payload.work_item_type?.trim() || 'Task',
     WORK_ITEM_REQUIRE_APPROVAL: payload.require_approval === true ? 'true' : 'false',
     PROJECT_ID: payload.project_id,
     AGENT_INSTRUCTIONS: agent.instructions?.trim() ?? 'Assist the user.',
@@ -142,6 +146,7 @@ export function getWorkItemCommentedPromptVariables(
     WORK_ITEM_DESCRIPTION: workItem.description?.trim() || 'None',
     WORK_ITEM_PRIORITY: workItem.priority ?? 'Medium',
     WORK_ITEM_STATUS: workItem.status ?? 'todo',
+    WORK_ITEM_TYPE: workItem.work_item_type?.trim() || 'Task',
     WORK_ITEM_REQUIRE_APPROVAL: 'false',
     WORK_ITEM_COMMENTS: commentsText,
     PROJECT_ID: workItem.project_id,

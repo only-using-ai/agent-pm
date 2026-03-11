@@ -28,6 +28,8 @@ describe('projects.service', () => {
           description: null,
           path: null,
           project_context: null,
+          color: null,
+          icon: null,
           created_at: '2025-01-01',
           archived_at: null,
         },
@@ -54,6 +56,8 @@ describe('projects.service', () => {
         description: null,
         path: null,
         project_context: null,
+        color: null,
+        icon: null,
         created_at: '2025-01-01',
         archived_at: null,
       }
@@ -78,6 +82,8 @@ describe('projects.service', () => {
         description: null,
         path: null,
         project_context: null,
+        color: null,
+        icon: null,
         created_at: '2025-01-01',
         archived_at: null,
       }
@@ -88,7 +94,7 @@ describe('projects.service', () => {
       expect(result).toEqual(row)
       expect(mockQuery).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO projects'),
-        ['New', null, null, null, null]
+        ['New', null, null, null, null, null, null]
       )
       expect(mockQuery).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO project_columns'),
@@ -112,6 +118,8 @@ describe('projects.service', () => {
         description: null,
         path: null,
         project_context: null,
+        color: null,
+        icon: null,
         created_at: '2025-01-01',
         archived_at: null,
       }
@@ -128,6 +136,8 @@ describe('projects.service', () => {
         description: null,
         path: null,
         project_context: null,
+        color: null,
+        icon: null,
         created_at: '2025-01-01',
         archived_at: null,
       }
@@ -141,6 +151,30 @@ describe('projects.service', () => {
         'name must be a non-empty string'
       )
     })
+
+    it('updates color and icon and returns them in the row', async () => {
+      const row: ProjectRow = {
+        id: 'p1',
+        name: 'P',
+        priority: null,
+        description: null,
+        path: null,
+        project_context: null,
+        color: '#22c55e',
+        icon: '📁',
+        created_at: '2025-01-01',
+        archived_at: null,
+      }
+      mockQuery.mockResolvedValue({ rows: [row] })
+      const result = await updateProject(pool, 'p1', { color: '#22c55e', icon: '📁' })
+      expect(result).toEqual(row)
+      expect(result?.color).toBe('#22c55e')
+      expect(result?.icon).toBe('📁')
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('color = $'),
+        expect.arrayContaining(['#22c55e', '📁', 'p1'])
+      )
+    })
   })
 
   describe('archiveProject', () => {
@@ -152,6 +186,8 @@ describe('projects.service', () => {
         description: null,
         path: null,
         project_context: null,
+        color: null,
+        icon: null,
         created_at: '2025-01-01',
         archived_at: '2025-01-02',
       }
