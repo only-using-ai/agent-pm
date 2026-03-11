@@ -65,6 +65,7 @@ export async function initDb(p: pg.Pool): Promise<void> {
         priority TEXT,
         description TEXT,
         path TEXT,
+        project_context TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         archived_at TIMESTAMPTZ
       );
@@ -77,6 +78,9 @@ export async function initDb(p: pg.Pool): Promise<void> {
         END IF;
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'projects' AND column_name = 'path') THEN
           ALTER TABLE projects ADD COLUMN path TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'projects' AND column_name = 'project_context') THEN
+          ALTER TABLE projects ADD COLUMN project_context TEXT;
         END IF;
       END $$;
     `)
@@ -147,6 +151,28 @@ export async function initDb(p: pg.Pool): Promise<void> {
       );
     `)
     await client.query(`
+      ALTER TABLE work_item_comments ADD COLUMN IF NOT EXISTS mentioned_agent_ids UUID[] DEFAULT '{}'
+    `)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS assets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        parent_id UUID REFERENCES assets(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('file', 'link', 'folder')),
+        path TEXT,
+        url TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS work_item_assets (
+        work_item_id UUID NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+        asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+        PRIMARY KEY (work_item_id, asset_id)
+      );
+    `)
+    await client.query(`
       CREATE TABLE IF NOT EXISTS approval_requests (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -199,6 +225,20 @@ export async function initDb(p: pg.Pool): Promise<void> {
     `)
     await client.query(`
       CREATE INDEX IF NOT EXISTS hook_queue_pending_idx ON hook_queue (created_at) WHERE status = 'pending';
+    `)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_profile (
+        id TEXT PRIMARY KEY DEFAULT 'default',
+        first_name TEXT,
+        last_name TEXT,
+        avatar_path TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `)
+    await client.query(`
+      INSERT INTO user_profile (id, first_name, last_name)
+      VALUES ('default', 'Alex', 'Johnson')
+      ON CONFLICT (id) DO NOTHING
     `)
     await client.query(`
       INSERT INTO prompts (key, name, content)

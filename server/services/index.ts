@@ -9,6 +9,7 @@ export * from './teams.service.js'
 export * from './projects.service.js'
 export * from './project-columns.service.js'
 export * from './work-items.service.js'
+export * from './assets.service.js'
 export * from './ollama.service.js'
 export * from './cursor.service.js'
 export * from './anthropic.service.js'
@@ -18,3 +19,7 @@ export {
   type WorkItemCreatedHandlerDeps,
   type AgentStreamChunk,
 } from './work-item-created-handler.js'
+export {
+  createWorkItemCommentedHandler,
+  type WorkItemCommentedHandlerDeps,
+} from './work-item-commented-handler.js'

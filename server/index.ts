@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import path from 'node:path'
 import cors from 'cors'
 import express from 'express'
 import multer from 'multer'
@@ -13,6 +14,7 @@ import {
   buildContextForWorkItemCreated,
   buildContextForWorkItemAssignmentChange,
   buildContextForWorkItemApproved,
+  buildContextForWorkItemCommented,
 } from './agent/index.js'
 import type { AgentContext, ChatMessage } from './agent/types.js'
 import {
@@ -46,6 +48,21 @@ import {
   addWorkItemComment,
 } from './services/work-items.service.js'
 import {
+  listAssetsByProject,
+  buildAssetTree,
+  getAsset,
+  createAsset,
+  updateAsset,
+  deleteAsset,
+  linkAssetToWorkItem,
+} from './services/assets.service.js'
+import {
+  deleteProjectFile,
+  listDirectoryTree,
+  readProjectFileContent,
+  writeProjectFileContent,
+} from './services/project-files.service.js'
+import {
   listInboxItems,
   resolveApprovalRequest,
   createApprovalRequest,
@@ -66,6 +83,7 @@ import { createSseBroadcaster } from './services/sse.service.js'
 import { createWorkItemCreatedHandler } from './services/work-item-created-handler.js'
 import { createWorkItemAssignmentChangeHandler } from './services/work-item-assignment-change-handler.js'
 import { createWorkItemApprovedHandler } from './services/work-item-approved-handler.js'
+import { createWorkItemCommentedHandler } from './services/work-item-commented-handler.js'
 import type { AgentStreamChunk } from './services/work-item-created-handler.js'
 import {
   getContextContent,
@@ -74,15 +92,24 @@ import {
   saveContextFile,
   deleteContextFile,
 } from './services/context.service.js'
+import {
+  getProfile,
+  updateProfile,
+  saveAvatar,
+  getAvatarFilePath,
+  readAvatarFile,
+} from './services/profile.service.js'
 import type {
   CreateAgentInput,
   UpdateAgentInput,
   UpdateMcpToolInput,
   UpdateWorkItemInput,
+  UpdateAssetInput,
 } from './services/types.js'
+import { getServerPort } from './config.js'
 
 const app = express()
-const PORT = process.env.PORT ?? 3001
+const PORT = getServerPort()
 const pool = () => getPool()
 const sse = createSseBroadcaster()
 
@@ -91,7 +118,9 @@ on(
   createWorkItemCreatedHandler({
     getPool: pool,
     getAgentById,
+    getProjectById,
     getPromptByKey,
+    getContextContent,
     buildContextForWorkItemCreated,
     getInitialMessages: (agent, context) => buildAgentPrompt(agent, context as AgentContext),
     runAgentStream: async function* (agent, context, options) {
@@ -123,6 +152,9 @@ on(
       const row = await createInfoRequest(p, input)
       return { id: row.id }
     },
+    linkAssetToWorkItem: (p, projectId, workItemId, assetId) =>
+      linkAssetToWorkItem(p, projectId, workItemId, assetId),
+    createAsset: (p, projectId, input) => createAsset(p, projectId, input),
     broadcaster: sse,
   })
 )
@@ -132,7 +164,9 @@ on(
   createWorkItemAssignmentChangeHandler({
     getPool: pool,
     getAgentById,
+    getProjectById,
     getPromptByKey,
+    getContextContent,
     buildContextForWorkItemAssignmentChange,
     getInitialMessages: (agent, context) => buildAgentPrompt(agent, context as AgentContext),
     runAgentStream: async function* (agent, context, options) {
@@ -164,6 +198,9 @@ on(
       const row = await createInfoRequest(p, input)
       return { id: row.id }
     },
+    linkAssetToWorkItem: (p, projectId, workItemId, assetId) =>
+      linkAssetToWorkItem(p, projectId, workItemId, assetId),
+    createAsset: (p, projectId, input) => createAsset(p, projectId, input),
     broadcaster: sse,
   })
 )
@@ -205,6 +242,56 @@ on(
       const row = await createInfoRequest(p, input)
       return { id: row.id }
     },
+    linkAssetToWorkItem: (p, projectId, workItemId, assetId) =>
+      linkAssetToWorkItem(p, projectId, workItemId, assetId),
+    createAsset: (p, projectId, input) => createAsset(p, projectId, input),
+    broadcaster: sse,
+  })
+)
+
+on(
+  'work_item.commented',
+  createWorkItemCommentedHandler({
+    getPool: pool,
+    getAgentById,
+    getProjectById,
+    getWorkItem: (p, projectId, workItemId) => getWorkItem(p, projectId, workItemId),
+    listAgents: (p) => listAgents(p),
+    getPromptByKey,
+    getContextContent,
+    buildContextForWorkItemCommented,
+    getInitialMessages: (agent, context) => buildAgentPrompt(agent, context as AgentContext),
+    runAgentStream: async function* (agent, context, options) {
+      let workspace: string | undefined
+      if (options?.toolContext?.projectId) {
+        const project = await getProjectById(pool(), options.toolContext.projectId)
+        if (project?.path?.trim()) workspace = project.path.trim()
+      }
+      const mcpToolConfigs = await listMcpTools(pool())
+      yield* runAgentStreamImpl(agent, context as AgentContext, {
+        messages: options?.messages as ChatMessage[] | undefined,
+        toolContext: options?.toolContext,
+        mcpToolConfigs,
+        workspace,
+      }) as AsyncIterable<AgentStreamChunk>
+    },
+    updateWorkItem: (p, projectId, workItemId, input) =>
+      updateWorkItem(p, projectId, workItemId, input),
+    addWorkItemComment: (p, projectId, workItemId, body, options) =>
+      addWorkItemComment(p, projectId, workItemId, body, options),
+    createWorkItem: (p, projectId, input) => createWorkItem(p, projectId, input),
+    emitWorkItemCreated: (payload: WorkItemCreatedPayload) => emit('work_item.created', payload),
+    createApprovalRequest: async (p, input) => {
+      const row = await createApprovalRequest(p, input)
+      return { id: row.id }
+    },
+    createInfoRequest: async (p, input) => {
+      const row = await createInfoRequest(p, input)
+      return { id: row.id }
+    },
+    linkAssetToWorkItem: (p, projectId, workItemId, assetId) =>
+      linkAssetToWorkItem(p, projectId, workItemId, assetId),
+    createAsset: (p, projectId, input) => createAsset(p, projectId, input),
     broadcaster: sse,
   })
 )
@@ -415,9 +502,9 @@ app.post('/api/projects', async (req, res) => {
 
 app.patch('/api/projects/:id', async (req, res) => {
   const { id } = req.params
-  const { name, priority, description, path } = req.body
+  const { name, priority, description, path, project_context } = req.body
   try {
-    const row = await updateProject(pool(), id, { name, priority, description, path })
+    const row = await updateProject(pool(), id, { name, priority, description, path, project_context })
     if (!row) return res.status(404).json({ error: 'Project not found' })
     res.json(row)
   } catch (e) {
@@ -470,9 +557,9 @@ app.post('/api/projects/:projectId/columns', async (req, res) => {
 
 app.patch('/api/projects/:projectId/columns/:columnId', async (req, res) => {
   const { projectId, columnId } = req.params
-  const { title, color } = req.body
+  const { title, color, position } = req.body
   try {
-    const row = await updateColumn(pool(), projectId, columnId, { title, color })
+    const row = await updateColumn(pool(), projectId, columnId, { title, color, position })
     if (!row) return res.status(404).json({ error: 'Column not found' })
     res.json(row)
   } catch (e) {
@@ -626,7 +713,7 @@ app.get('/api/projects/:projectId/work-items/:id', async (req, res) => {
 
 app.post('/api/projects/:projectId/work-items', async (req, res) => {
   const { projectId } = req.params
-  const { title, description, assigned_to, priority, depends_on, status, require_approval } =
+  const { title, description, assigned_to, priority, depends_on, status, require_approval, asset_ids } =
     req.body
   try {
     const row = await createWorkItem(pool(), projectId, {
@@ -637,6 +724,7 @@ app.post('/api/projects/:projectId/work-items', async (req, res) => {
       depends_on,
       status,
       require_approval,
+      asset_ids: Array.isArray(asset_ids) ? asset_ids : undefined,
     })
     if (row.require_approval) {
       await createApprovalRequest(pool(), {
@@ -660,7 +748,7 @@ app.post('/api/projects/:projectId/work-items', async (req, res) => {
 
 app.patch('/api/projects/:projectId/work-items/:id', async (req, res) => {
   const { projectId, id } = req.params
-  const { title, description, assigned_to, priority, depends_on, status, require_approval } =
+  const { title, description, assigned_to, priority, depends_on, status, require_approval, asset_ids } =
     req.body
   const updates: UpdateWorkItemInput = {}
   if (title !== undefined) updates.title = title
@@ -670,6 +758,7 @@ app.patch('/api/projects/:projectId/work-items/:id', async (req, res) => {
   if (depends_on !== undefined) updates.depends_on = depends_on
   if (status !== undefined) updates.status = status
   if (require_approval !== undefined) updates.require_approval = require_approval
+  if (asset_ids !== undefined) updates.asset_ids = Array.isArray(asset_ids) ? asset_ids : []
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'No fields to update' })
   }
@@ -811,6 +900,66 @@ app.delete('/api/context/files/:name', async (req, res) => {
   }
 })
 
+// Profile
+app.get('/api/profile', async (_req, res) => {
+  try {
+    const profile = await getProfile(pool())
+    if (!profile) return res.status(404).json({ error: 'Profile not found' })
+    res.json(profile)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Failed to fetch profile' })
+  }
+})
+
+app.patch('/api/profile', async (req, res) => {
+  const { first_name, last_name } = req.body
+  try {
+    const profile = await updateProfile(pool(), { first_name, last_name })
+    res.json(profile)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Failed to update profile' })
+  }
+})
+
+app.post('/api/profile/avatar', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' })
+  }
+  if (!req.file.mimetype.startsWith('image/')) {
+    return res.status(400).json({ error: 'File must be an image' })
+  }
+  try {
+    const profile = await saveAvatar(
+      pool(),
+      req.file.buffer,
+      req.file.mimetype,
+      req.file.originalname
+    )
+    res.status(200).json(profile)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Failed to upload avatar' })
+  }
+})
+
+app.get('/api/profile/avatar', async (_req, res) => {
+  try {
+    const filePath = await getAvatarFilePath(pool())
+    if (!filePath) return res.status(404).send()
+    const buf = await readAvatarFile(filePath)
+    const ext = path.extname(filePath).toLowerCase()
+    const mime =
+      ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/jpeg'
+    res.setHeader('Content-Type', mime)
+    res.send(buf)
+  } catch (e) {
+    console.error(e)
+    res.status(500).send()
+  }
+})
+
 // Prompts (settings)
 app.get('/api/prompts', async (_req, res) => {
   try {
@@ -846,24 +995,239 @@ app.patch('/api/prompts/:key', async (req, res) => {
   }
 })
 
+// Project directory tree (filesystem)
+app.get('/api/projects/:projectId/files', async (req, res) => {
+  try {
+    const project = await getProjectById(pool(), req.params.projectId)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const rawPath = project.path?.trim()
+    if (!rawPath) return res.json({ tree: [] })
+    const rootDir = path.isAbsolute(rawPath)
+      ? rawPath
+      : path.resolve(process.cwd(), rawPath)
+    const tree = await listDirectoryTree(rootDir)
+    res.json({ tree })
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Failed to list project files' })
+  }
+})
+
+app.get('/api/projects/:projectId/files/content', async (req, res) => {
+  try {
+    const project = await getProjectById(pool(), req.params.projectId)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const rawPath = project.path?.trim()
+    if (!rawPath) return res.status(400).json({ error: 'Project has no base path' })
+    const rootDir = path.isAbsolute(rawPath)
+      ? rawPath
+      : path.resolve(process.cwd(), rawPath)
+    const filePath = req.query.path
+    if (typeof filePath !== 'string' || !filePath) {
+      return res.status(400).json({ error: 'Missing path query' })
+    }
+    const content = await readProjectFileContent(rootDir, filePath)
+    res.json({ content })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Failed to read file'
+    if (msg === 'File not found' || msg === 'Not a file') return res.status(404).json({ error: msg })
+    if (msg === 'Invalid path' || msg === 'Access denied' || msg === 'File too large') {
+      return res.status(400).json({ error: msg })
+    }
+    console.error(e)
+    res.status(500).json({ error: 'Failed to read file' })
+  }
+})
+
+app.put('/api/projects/:projectId/files/content', async (req, res) => {
+  try {
+    const project = await getProjectById(pool(), req.params.projectId)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const rawPath = project.path?.trim()
+    if (!rawPath) return res.status(400).json({ error: 'Project has no base path' })
+    const rootDir = path.isAbsolute(rawPath)
+      ? rawPath
+      : path.resolve(process.cwd(), rawPath)
+    const filePath = req.query.path
+    if (typeof filePath !== 'string' || !filePath) {
+      return res.status(400).json({ error: 'Missing path query' })
+    }
+    const { content } = req.body
+    if (typeof content !== 'string') {
+      return res.status(400).json({ error: 'content must be a string' })
+    }
+    await writeProjectFileContent(rootDir, filePath, content)
+    res.json({ content })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Failed to write file'
+    if (msg === 'File not found' || msg === 'Not a file') return res.status(404).json({ error: msg })
+    if (msg === 'Invalid path' || msg === 'Access denied') {
+      return res.status(400).json({ error: msg })
+    }
+    console.error(e)
+    res.status(500).json({ error: 'Failed to write file' })
+  }
+})
+
+app.delete('/api/projects/:projectId/files', async (req, res) => {
+  try {
+    const project = await getProjectById(pool(), req.params.projectId)
+    if (!project) return res.status(404).json({ error: 'Project not found' })
+    const rawPath = project.path?.trim()
+    if (!rawPath) return res.status(400).json({ error: 'Project has no base path' })
+    const rootDir = path.isAbsolute(rawPath)
+      ? rawPath
+      : path.resolve(process.cwd(), rawPath)
+    const filePath = req.query.path
+    if (typeof filePath !== 'string' || !filePath) {
+      return res.status(400).json({ error: 'Missing path query' })
+    }
+    await deleteProjectFile(rootDir, filePath)
+    res.status(204).send()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Failed to delete file'
+    if (msg === 'File not found' || msg === 'Cannot delete directory') return res.status(404).json({ error: msg })
+    if (msg === 'Invalid path' || msg === 'Access denied') {
+      return res.status(400).json({ error: msg })
+    }
+    console.error(e)
+    res.status(500).json({ error: 'Failed to delete file' })
+  }
+})
+
+// Assets (by project)
+app.get('/api/projects/:projectId/assets', async (req, res) => {
+  try {
+    const flat = await listAssetsByProject(pool(), req.params.projectId)
+    const tree = buildAssetTree(flat)
+    res.json({ flat, tree })
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Failed to list assets' })
+  }
+})
+
+app.get('/api/projects/:projectId/assets/:assetId', async (req, res) => {
+  try {
+    const row = await getAsset(pool(), req.params.projectId, req.params.assetId)
+    if (!row) return res.status(404).json({ error: 'Asset not found' })
+    res.json(row)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Failed to fetch asset' })
+  }
+})
+
+app.post('/api/projects/:projectId/assets', async (req, res) => {
+  const { projectId } = req.params
+  const { name, type, parent_id, path, url, work_item_ids } = req.body
+  if (!name || !type) {
+    return res.status(400).json({ error: 'name and type are required' })
+  }
+  if (type !== 'file' && type !== 'link' && type !== 'folder') {
+    return res.status(400).json({ error: 'type must be file, link, or folder' })
+  }
+  try {
+    const row = await createAsset(pool(), projectId, {
+      name: name.trim(),
+      type,
+      parent_id: parent_id ?? null,
+      path: path ?? null,
+      url: url ?? null,
+      work_item_ids: Array.isArray(work_item_ids) ? work_item_ids : undefined,
+    })
+    res.status(201).json(row)
+  } catch (e) {
+    if (e instanceof Error && e.message === 'name is required') {
+      return res.status(400).json({ error: e.message })
+    }
+    console.error(e)
+    res.status(500).json({ error: 'Failed to create asset' })
+  }
+})
+
+app.patch('/api/projects/:projectId/assets/:assetId', async (req, res) => {
+  const { projectId, assetId } = req.params
+  const { name, type, parent_id, path, url } = req.body
+  try {
+    const updates: Record<string, unknown> = {}
+    if (name !== undefined) updates.name = name
+    if (type !== undefined) updates.type = type
+    if (parent_id !== undefined) updates.parent_id = parent_id
+    if (path !== undefined) updates.path = path
+    if (url !== undefined) updates.url = url
+    const row = await updateAsset(pool(), projectId, assetId, updates as UpdateAssetInput)
+    if (!row) return res.status(404).json({ error: 'Asset not found' })
+    res.json(row)
+  } catch (e) {
+    if (e instanceof Error && (e.message === 'name cannot be empty' || e.message === 'type must be file, link, or folder')) {
+      return res.status(400).json({ error: e.message })
+    }
+    console.error(e)
+    res.status(500).json({ error: 'Failed to update asset' })
+  }
+})
+
+app.delete('/api/projects/:projectId/assets/:assetId', async (req, res) => {
+  try {
+    const deleted = await deleteAsset(pool(), req.params.projectId, req.params.assetId)
+    if (!deleted) return res.status(404).json({ error: 'Asset not found' })
+    res.status(204).send()
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Failed to delete asset' })
+  }
+})
+
+app.post('/api/projects/:projectId/work-items/:workItemId/assets', async (req, res) => {
+  const { projectId, workItemId } = req.params
+  const { asset_id: assetId } = req.body
+  if (!assetId || typeof assetId !== 'string') {
+    return res.status(400).json({ error: 'asset_id is required' })
+  }
+  try {
+    const workItem = await getWorkItem(pool(), projectId, workItemId)
+    if (!workItem) return res.status(404).json({ error: 'Work item not found' })
+    const { linked } = await linkAssetToWorkItem(pool(), projectId, workItemId, assetId.trim())
+    res.status(linked ? 201 : 200).json({ linked })
+  } catch (e) {
+    if (e instanceof Error && e.message === 'Asset not found') {
+      return res.status(404).json({ error: e.message })
+    }
+    console.error(e)
+    res.status(500).json({ error: 'Failed to link asset to work item' })
+  }
+})
+
 app.post(
   '/api/projects/:projectId/work-items/:id/comments',
   async (req, res) => {
     const { projectId, id } = req.params
-    const { body, author_type, author_id } = req.body
+    const { body, author_type, author_id, mentioned_agent_ids } = req.body
     try {
       const comment = await addWorkItemComment(
         pool(),
         projectId,
         id,
         body,
-        { author_type, author_id }
+        { author_type, author_id, mentioned_agent_ids }
       )
       emit('work_item.comment', {
         comment,
         work_item_id: id,
         project_id: projectId,
       })
+      const mentionedIds = Array.isArray(comment.mentioned_agent_ids)
+        ? comment.mentioned_agent_ids
+        : []
+      if (mentionedIds.length > 0) {
+        emit('work_item.commented', {
+          comment,
+          work_item_id: id,
+          project_id: projectId,
+          mentioned_agent_ids: mentionedIds,
+        })
+      }
       res.status(201).json(comment)
     } catch (e) {
       if (e instanceof Error && e.message === 'body is required') {

@@ -4,10 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"wait-on http://localhost:3001/api/health -t 60000 && vite\"",
+    "dev": "concurrently \"npm run dev:server\" \"wait-on http://localhost:38472/api/health -t 60000 && vite\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:frontend": "vite",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "build": "tsc -b && vite build",
+    "build:cli": "tsc -p tsconfig.cli.json",
+    "pm": "tsx cli/index.ts",
+    "daemon": "node deploy/run-daemon-install.js",
+    "daemon:user": "node deploy/run-daemon-install.js --user",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -25,6 +32,7 @@
     "@langchain/ollama": "^1.2.6",
     "@langchain/openai": "^1.2.12",
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@tauri-apps/api": "^2.10.1",
     "@uiw/react-md-editor": "^4.0.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -50,6 +58,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.2.1",
+    "@tauri-apps/cli": "^2.10.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/cors": "^2.8.19",
@@ -75,6 +84,9 @@
     "vite": "^7.3.1",
     "vitest": "^4.0.18",
     "wait-on": "^8.0.1"
+  },
+  "bin": {
+    "pm": "dist/cli/index.js"
   },
   "overrides": {
     "dotenv": "^17.3.1"

@@ -13,6 +13,7 @@ import type {
   UpdateWorkItemInput,
   ListOptions,
 } from './types.js'
+import { getAssetIdsForWorkItem, setWorkItemAssets } from './assets.service.js'
 
 const WORK_ITEM_COLUMNS =
   'id, project_id, title, description, assigned_to, priority, depends_on, status, require_approval, archived_at, created_at, updated_at'
@@ -77,13 +78,15 @@ export async function getWorkItem(
   if (rows.length === 0) return null
   const item = rows[0] as WorkItemRow
   const { rows: comments } = await pool.query(
-    `SELECT id, work_item_id, author_type, author_id, body, created_at
+    `SELECT id, work_item_id, author_type, author_id, body, created_at, mentioned_agent_ids
      FROM work_item_comments WHERE work_item_id = $1 ORDER BY created_at ASC`,
     [id]
   )
+  const assetIds = await getAssetIdsForWorkItem(pool, id)
   return {
     ...item,
     comments: comments as WorkItemCommentRow[],
+    asset_ids: assetIds,
   }
 }
 
@@ -117,7 +120,11 @@ export async function createWorkItem(
       requireApproval,
     ]
   )
-  return rows[0] as WorkItemRow
+  const workItem = rows[0] as WorkItemRow
+  if (input.asset_ids?.length) {
+    await setWorkItemAssets(pool, projectId, workItem.id, input.asset_ids)
+  }
+  return workItem
 }
 
 export async function updateWorkItem(
@@ -166,7 +173,11 @@ export async function updateWorkItem(
     values.push(input.require_approval === true)
   }
 
-  if (updates.length <= 1) {
+  if (input.asset_ids !== undefined) {
+    await setWorkItemAssets(pool, projectId, id, input.asset_ids)
+  }
+
+  if (updates.length <= 1 && input.asset_ids === undefined) {
     const { rows: r } = await pool.query(
       `SELECT ${WORK_ITEM_COLUMNS} FROM work_items WHERE id = $1 AND project_id = $2`,
       [id, projectId]
@@ -202,7 +213,11 @@ export async function addWorkItemComment(
   projectId: string,
   workItemId: string,
   body: string,
-  options: { author_type?: 'user' | 'agent'; author_id?: string | null } = {}
+  options: {
+    author_type?: 'user' | 'agent'
+    author_id?: string | null
+    mentioned_agent_ids?: string[]
+  } = {}
 ): Promise<WorkItemCommentRow> {
   const trimmed =
     typeof body === 'string' && body.trim() ? body.trim() : ''
@@ -218,11 +233,18 @@ export async function addWorkItemComment(
   }
   const authorType = options.author_type === 'agent' ? 'agent' : 'user'
   const authorId = authorType === 'agent' ? options.author_id ?? null : null
+  const mentionedAgentIds = Array.isArray(options.mentioned_agent_ids)
+    ? options.mentioned_agent_ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    : []
   const { rows } = await pool.query(
-    `INSERT INTO work_item_comments (work_item_id, author_type, author_id, body)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, work_item_id, author_type, author_id, body, created_at`,
-    [workItemId, authorType, authorId, trimmed]
+    `INSERT INTO work_item_comments (work_item_id, author_type, author_id, body, mentioned_agent_ids)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, work_item_id, author_type, author_id, body, created_at, mentioned_agent_ids`,
+    [workItemId, authorType, authorId, trimmed, mentionedAgentIds]
   )
-  return rows[0] as WorkItemCommentRow
+  const row = rows[0] as WorkItemCommentRow
+  if (row.mentioned_agent_ids == null && mentionedAgentIds.length > 0) {
+    row.mentioned_agent_ids = mentionedAgentIds
+  }
+  return row
 }

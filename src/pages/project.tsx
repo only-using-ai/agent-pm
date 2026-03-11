@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Plus, Settings2, Trash2 } from 'lucide-react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, ChevronDown, GripVertical, Plus, Settings2, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useProjects } from '@/contexts/projects-context'
 import { useAgents } from '@/contexts/agents-context'
 import { useAgentStream } from '@/contexts/agent-stream-context'
+import { useInbox } from '@/contexts/inbox-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,6 +27,12 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   listProjectColumns,
   createProjectColumn,
   updateProjectColumn,
@@ -36,12 +43,14 @@ import {
   updateWorkItem,
   archiveWorkItem,
   addWorkItemComment,
+  listAssets,
   type WorkItem,
   type WorkItemWithComments,
   type WorkItemComment,
   type WorkItemPriority,
   type CreateWorkItemBody,
   type ProjectColumn,
+  type Asset,
 } from '@/lib/api'
 
 const COLOR_OPTIONS = [
@@ -108,6 +117,12 @@ function DroppableColumn({
   onDragStartItem,
   onDragEndItem,
   canRemove,
+  headerLeft,
+  isColumnDropTarget,
+  onColumnDrop,
+  isColumnDragActive,
+  onColumnDragOver,
+  onColumnDragLeave,
 }: {
   column: KanbanColumn
   items: KanbanItem[]
@@ -119,29 +134,48 @@ function DroppableColumn({
   onDragStartItem?: () => void
   onDragEndItem?: () => void
   canRemove: boolean
+  headerLeft?: React.ReactNode
+  isColumnDropTarget?: boolean
+  onColumnDrop?: (draggedColumnId: string, targetColumnId: string) => void
+  isColumnDragActive?: boolean
+  onColumnDragOver?: () => void
+  onColumnDragLeave?: () => void
 }) {
   const [isOver, setIsOver] = useState(false)
   const [showActions, setShowActions] = useState(false)
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setIsOver(true)
-  }, [])
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      if (isColumnDragActive && onColumnDragOver) onColumnDragOver()
+      setIsOver(true)
+    },
+    [isColumnDragActive, onColumnDragOver]
+  )
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsOver(false)
-  }, [])
+  const handleDragLeave = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      if (onColumnDragLeave) onColumnDragLeave()
+      setIsOver(false)
+    },
+    [onColumnDragLeave]
+  )
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
       setIsOver(false)
+      const columnId = e.dataTransfer.getData('application/x-kanban-column')
+      if (columnId && columnId !== column.id && onColumnDrop) {
+        onColumnDrop(columnId, column.id)
+        return
+      }
       const itemId = e.dataTransfer.getData('application/x-kanban-item')
       if (itemId) onMoveItem(itemId, column.id)
     },
-    [column.id, onMoveItem]
+    [column.id, onMoveItem, onColumnDrop]
   )
 
   return (
@@ -149,7 +183,8 @@ function DroppableColumn({
       className={cn(
         'flex min-w-[200px] flex-1 flex-col rounded-xl border-2 border-dashed p-3 transition-colors',
         column.color,
-        isOver && 'border-primary bg-primary/5'
+        isOver && 'border-primary bg-primary/5',
+        isColumnDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -159,9 +194,12 @@ function DroppableColumn({
       onMouseLeave={() => setShowActions(false)}
     >
       <div className="mb-2 flex items-center justify-between gap-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {column.title}
-        </h3>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          {headerLeft}
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {column.title}
+          </h3>
+        </div>
         {(onEditColumn || canRemove) && (
           <div
             className={cn(
@@ -248,9 +286,11 @@ function workItemsToKanban(items: WorkItem[]): KanbanItem[] {
 
 export function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { projects } = useProjects()
   const { agents } = useAgents()
   const { lastWorkItemStatusUpdate } = useAgentStream()
+  const { refetch: refetchInbox } = useInbox()
   const [columns, setColumns] = useState<KanbanColumn[]>([])
   const [columnsLoading, setColumnsLoading] = useState(true)
   const [workItems, setWorkItems] = useState<WorkItem[]>([])
@@ -291,9 +331,24 @@ export function ProjectPage() {
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [newComment, setNewComment] = useState('')
+  const [mentionedAgentIds, setMentionedAgentIds] = useState<string[]>([])
+  const [mentionDropdown, setMentionDropdown] = useState<{ show: boolean; filter: string; startIndex: number }>({
+    show: false,
+    filter: '',
+    startIndex: 0,
+  })
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null)
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [archiveSubmitting, setArchiveSubmitting] = useState(false)
+  const [projectAssets, setProjectAssets] = useState<Asset[]>([])
+  const [linkedAssetIds, setLinkedAssetIds] = useState<string[]>([])
+  const [addAssetSelectValue, setAddAssetSelectValue] = useState('')
   const dragInProgressRef = useRef(false)
+  /** Column IDs to hide from the board (status filter). */
+  const [hiddenColumnIds, setHiddenColumnIds] = useState<Set<string>>(new Set())
+  const [columnDragId, setColumnDragId] = useState<string | null>(null)
+  const [columnDropTargetId, setColumnDropTargetId] = useState<string | null>(null)
+  const [, setReorderingColumns] = useState(false)
 
   const project = projectId ? projects.find((p) => p.id === projectId) : null
   const projectName = project?.name ?? 'Project'
@@ -332,6 +387,14 @@ export function ProjectPage() {
   useEffect(() => {
     fetchWorkItems()
   }, [fetchWorkItems])
+
+  // Open work item modal when navigating with ?workItem=id (e.g. from command palette)
+  const workItemParam = searchParams.get('workItem')
+  useEffect(() => {
+    if (!projectId || !workItemParam || workItems.length === 0) return
+    const exists = workItems.some((w) => w.id === workItemParam)
+    if (exists) setEditingWorkItemId(workItemParam)
+  }, [projectId, workItemParam, workItems])
 
   // Sync work item status when an agent updates it via tool (e.g. update_work_item_status)
   useEffect(() => {
@@ -474,18 +537,22 @@ export function ProjectPage() {
       })
       setWorkItems((prev) => [created, ...prev])
       setCreateModalOpen(false)
+      if (createForm.require_approval) await refetchInbox()
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : 'Failed to create work item')
     } finally {
       setCreateSubmitting(false)
     }
-  }, [projectId, createForm])
+  }, [projectId, createForm, refetchInbox])
 
   useEffect(() => {
     if (!projectId || !editingWorkItemId) return
     let cancelled = false
     setEditingWorkItem(null)
-    getWorkItem(projectId, editingWorkItemId).then((data) => {
+    Promise.all([
+      getWorkItem(projectId, editingWorkItemId),
+      listAssets(projectId).then((r) => r.flat),
+    ]).then(([data, flat]) => {
       if (!cancelled && data) {
         setEditingWorkItem(data)
         setEditForm({
@@ -497,8 +564,10 @@ export function ProjectPage() {
           status: data.status,
           require_approval: data.require_approval ?? false,
         })
+        setLinkedAssetIds(data.asset_ids ?? [])
         setEditError(null)
       }
+      if (!cancelled) setProjectAssets(flat)
     })
     return () => {
       cancelled = true
@@ -514,7 +583,15 @@ export function ProjectPage() {
   const closeEditModal = useCallback(() => {
     setEditingWorkItemId(null)
     setEditingWorkItem(null)
+    setLinkedAssetIds([])
     setEditError(null)
+    if (searchParams.has('workItem')) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('workItem')
+        return next
+      }, { replace: true })
+    }
   }, [])
 
   const submitEditWorkItem = useCallback(async () => {
@@ -530,18 +607,19 @@ export function ProjectPage() {
         depends_on: editForm.depends_on || null,
         status: editForm.status,
         require_approval: editForm.require_approval ?? false,
+        asset_ids: linkedAssetIds,
       })
       setWorkItems((prev) =>
         prev.map((w) => (w.id === editingWorkItemId ? updated : w))
       )
-      setEditingWorkItem((prev) => (prev ? { ...prev, ...updated } : null))
+      setEditingWorkItem((prev) => (prev ? { ...prev, ...updated, asset_ids: linkedAssetIds } : null))
       closeEditModal()
     } catch (e) {
       setEditError(e instanceof Error ? e.message : 'Failed to update work item')
     } finally {
       setEditSubmitting(false)
     }
-  }, [projectId, editingWorkItemId, editForm, closeEditModal])
+  }, [projectId, editingWorkItemId, editForm, linkedAssetIds, closeEditModal])
 
   const submitComment = useCallback(async () => {
     if (!projectId || !editingWorkItemId || !newComment.trim()) return
@@ -551,16 +629,103 @@ export function ProjectPage() {
         projectId,
         editingWorkItemId,
         newComment.trim(),
-        { author_type: 'user' }
+        { author_type: 'user', mentioned_agent_ids: mentionedAgentIds }
       )
       setEditingWorkItem((prev) =>
         prev ? { ...prev, comments: [...prev.comments, comment] } : null
       )
       setNewComment('')
+      setMentionedAgentIds([])
+      setMentionDropdown((prev) => ({ ...prev, show: false }))
     } finally {
       setCommentSubmitting(false)
     }
-  }, [projectId, editingWorkItemId, newComment])
+  }, [projectId, editingWorkItemId, newComment, mentionedAgentIds])
+
+  const filteredAgentsForMention = mentionDropdown.show
+    ? agents.filter((a) =>
+        a.name.toLowerCase().includes(mentionDropdown.filter.toLowerCase().trim())
+      )
+    : []
+
+  const handleCommentChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const text = e.target.value
+      const start = e.target.selectionStart ?? 0
+      setNewComment(text)
+      const lastAt = text.slice(0, start).lastIndexOf('@')
+      if (lastAt === -1) {
+        setMentionDropdown((prev) => (prev.show ? { ...prev, show: false } : prev))
+        return
+      }
+      const filter = text.slice(lastAt + 1, start)
+      if (/\s/.test(filter)) {
+        setMentionDropdown((prev) => (prev.show ? { ...prev, show: false } : prev))
+        return
+      }
+      setMentionDropdown({ show: true, filter, startIndex: lastAt })
+    },
+    []
+  )
+
+  const handleCommentKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault()
+        submitComment()
+        return
+      }
+      if (e.key === '@' && !mentionDropdown.show) {
+        const ta = e.currentTarget
+        const start = ta.selectionStart ?? 0
+        setMentionDropdown({ show: true, filter: '', startIndex: start })
+        return
+      }
+      if (mentionDropdown.show) {
+        if (e.key === 'Escape') {
+          setMentionDropdown((prev) => ({ ...prev, show: false }))
+          e.preventDefault()
+        } else if (e.key === 'Enter' && filteredAgentsForMention.length > 0) {
+          e.preventDefault()
+          const agent = filteredAgentsForMention[0]
+          const ta = e.currentTarget
+          const before = newComment.slice(0, mentionDropdown.startIndex)
+          const after = newComment.slice(ta.selectionStart ?? 0)
+          const insert = `@${agent.name} `
+          setNewComment(before + insert + after)
+          setMentionedAgentIds((prev) => (prev.includes(agent.id) ? prev : [...prev, agent.id]))
+          setMentionDropdown({ show: false, filter: '', startIndex: 0 })
+          setTimeout(() => {
+            const newPos = (before + insert).length
+            ta.setSelectionRange(newPos, newPos)
+            ta.focus()
+          }, 0)
+        }
+      }
+    },
+    [mentionDropdown, newComment, filteredAgentsForMention, submitComment]
+  )
+
+  const selectMentionAgent = useCallback(
+    (agent: { id: string; name: string }) => {
+      const ta = commentTextareaRef.current
+      if (!ta) return
+      const start = mentionDropdown.startIndex
+      const end = ta.selectionStart ?? start
+      const before = newComment.slice(0, start)
+      const after = newComment.slice(end)
+      const insert = `@${agent.name} `
+      setNewComment(before + insert + after)
+      setMentionedAgentIds((prev) => (prev.includes(agent.id) ? prev : [...prev, agent.id]))
+      setMentionDropdown({ show: false, filter: '', startIndex: 0 })
+      setTimeout(() => {
+        const newPos = (before + insert).length
+        ta.setSelectionRange(newPos, newPos)
+        ta.focus()
+      }, 0)
+    },
+    [mentionDropdown.startIndex, newComment]
+  )
 
   const workItemsForDependsOn = workItems.filter((w) => w.id !== editingWorkItemId)
 
@@ -575,6 +740,32 @@ export function ProjectPage() {
       setArchiveSubmitting(false)
     }
   }, [projectId, editingWorkItemId, closeEditModal])
+
+  const reorderColumns = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (!projectId || fromIndex === toIndex) return
+      const reordered = [...columns]
+      const [removed] = reordered.splice(fromIndex, 1)
+      const insertIndex = fromIndex < toIndex ? toIndex - 1 : toIndex
+      reordered.splice(insertIndex, 0, removed)
+      setColumns(reordered)
+      setReorderingColumns(true)
+      try {
+        await Promise.all(
+          reordered.map((col, i) =>
+            updateProjectColumn(projectId, col.id, { position: i })
+          )
+        )
+      } catch {
+        await fetchColumns()
+      } finally {
+        setReorderingColumns(false)
+      }
+    },
+    [projectId, columns, fetchColumns]
+  )
+
+  const visibleColumns = columns.filter((c) => !hiddenColumnIds.has(c.id))
 
   return (
     <div className="flex h-full flex-col">
@@ -595,6 +786,43 @@ export function ProjectPage() {
           Create Work Item
         </Button>
       </div>
+
+      {!columnsLoading && columns.length > 0 && (
+        <div className="mb-3 flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-normal text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+              )}
+            >
+              Status
+              <span className="text-foreground">
+                ({visibleColumns.length}/{columns.length})
+              </span>
+              <ChevronDown className="size-3.5 opacity-50" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[180px]">
+              {columns.map((col) => (
+                <DropdownMenuCheckboxItem
+                  key={col.id}
+                  checked={!hiddenColumnIds.has(col.id)}
+                  onCheckedChange={(checked) => {
+                    setHiddenColumnIds((prev) => {
+                      const next = new Set(prev)
+                      if (checked) next.delete(col.id)
+                      else next.add(col.id)
+                      return next
+                    })
+                  }}
+                >
+                  {col.title}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
       <div className="flex flex-1 gap-4 overflow-x-auto pb-4">
         {columnsLoading || itemsLoading ? (
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
@@ -602,7 +830,7 @@ export function ProjectPage() {
           </div>
         ) : (
           <>
-            {columns.map((column) => (
+            {visibleColumns.map((column) => (
               <DroppableColumn
                 key={column.id}
                 column={column}
@@ -621,6 +849,37 @@ export function ProjectPage() {
                   }, 0)
                 }}
                 canRemove={columns.length > 1}
+                isColumnDragActive={columnDragId !== null}
+                isColumnDropTarget={columnDropTargetId === column.id}
+                onColumnDragOver={() => {
+                  if (column.id !== columnDragId) setColumnDropTargetId(column.id)
+                }}
+                onColumnDragLeave={() => setColumnDropTargetId(null)}
+                onColumnDrop={(draggedId, targetId) => {
+                  const from = columns.findIndex((c) => c.id === draggedId)
+                  const to = columns.findIndex((c) => c.id === targetId)
+                  if (from !== -1 && to !== -1) reorderColumns(from, to)
+                  setColumnDragId(null)
+                  setColumnDropTargetId(null)
+                }}
+                headerLeft={
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/x-kanban-column', column.id)
+                      e.dataTransfer.effectAllowed = 'move'
+                      setColumnDragId(column.id)
+                    }}
+                    onDragEnd={() => {
+                      setColumnDragId(null)
+                      setColumnDropTargetId(null)
+                    }}
+                    className="cursor-grab active:cursor-grabbing touch-none rounded p-0.5 -m-0.5 text-muted-foreground hover:text-foreground"
+                    title="Drag to reorder column"
+                  >
+                    <GripVertical className="size-3.5" />
+                  </div>
+                }
               />
             ))}
             {addingColumn ? (
@@ -679,13 +938,13 @@ export function ProjectPage() {
       <DialogRoot open={createModalOpen} onOpenChange={setCreateModalOpen}>
         <DialogPortal>
           <DialogBackdrop />
-          <DialogPopup className="max-w-xl border-l-4 border-l-primary">
+          <DialogPopup className="max-w-xl border-l-4 border-l-primary max-h-[90vh] flex flex-col">
             <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Create issue
             </div>
             <DialogTitle className="sr-only">Create Work Item</DialogTitle>
             <form
-              className="mt-3 flex flex-col gap-4"
+              className="mt-3 flex flex-1 flex-col gap-4 overflow-y-auto min-h-0"
               onSubmit={(e) => {
                 e.preventDefault()
                 submitCreateWorkItem()
@@ -715,7 +974,7 @@ export function ProjectPage() {
                   onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Describe the issue in more detail…"
                   rows={6}
-                  className="resize-y min-h-[120px]"
+                  className="resize-none min-h-[120px] max-h-[200px] overflow-y-auto"
                 />
               </div>
               <div className="space-y-1.5">
@@ -790,17 +1049,24 @@ export function ProjectPage() {
                   </Select>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-border p-3">
-                <Label htmlFor="create-require-approval" className="text-sm font-medium cursor-pointer">
-                  Require Approval
-                </Label>
-                <Switch
-                  id="create-require-approval"
-                  checked={createForm.require_approval ?? false}
-                  onCheckedChange={(checked) =>
-                    setCreateForm((f) => ({ ...f, require_approval: checked ?? false }))
-                  }
-                />
+              <div className="space-y-1 rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="create-require-approval" className="text-sm font-medium cursor-pointer">
+                    Require approval before starting
+                  </Label>
+                  <Switch
+                    id="create-require-approval"
+                    checked={createForm.require_approval ?? false}
+                    onCheckedChange={(checked) =>
+                      setCreateForm((f) => ({ ...f, require_approval: checked ?? false }))
+                    }
+                  />
+                </div>
+                {(createForm.require_approval ?? false) && (
+                  <p className="text-xs text-muted-foreground">
+                    Item will appear in Inbox; the agent starts after you approve.
+                  </p>
+                )}
               </div>
               {createError && (
                 <p className="text-sm text-destructive">{createError}</p>
@@ -894,7 +1160,7 @@ export function ProjectPage() {
       <DialogRoot open={editingWorkItemId !== null} onOpenChange={(open) => !open && closeEditModal()}>
         <DialogPortal>
           <DialogBackdrop />
-          <DialogPopup className="max-w-xl border-l-4 border-l-primary max-h-[90vh] flex flex-col">
+          <DialogPopup className="max-w-4xl w-full border-l-4 border-l-primary max-h-[90vh] flex flex-col">
             <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Edit issue
             </div>
@@ -902,121 +1168,209 @@ export function ProjectPage() {
             {!editingWorkItem ? (
               <div className="py-8 text-center text-muted-foreground">Loading…</div>
             ) : (
-              <div className="flex flex-1 flex-col gap-4 overflow-y-auto mt-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="edit-title" className="text-xs font-medium text-muted-foreground">
-                    Summary
-                  </Label>
-                  <Input
-                    id="edit-title"
-                    value={editForm.title}
-                    onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
-                    placeholder="Enter a short summary"
-                    className="text-base font-medium"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="edit-description" className="text-xs font-medium text-muted-foreground">
-                    Description
-                  </Label>
-                  <Textarea
-                    id="edit-description"
-                    value={editForm.description ?? ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-                    placeholder="Describe the issue in more detail…"
-                    rows={6}
-                    className="resize-y min-h-[120px]"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Assignee</Label>
-                  <Select
-                    value={editForm.assigned_to ?? ''}
-                    onValueChange={(v) =>
-                      setEditForm((f) => ({ ...f, assigned_to: v || null }))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Unassigned">
-                        {editForm.assigned_to
-                          ? (agents.find((a) => a.id === editForm.assigned_to)?.name ?? 'Unassigned')
-                          : undefined}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
-                      {agents.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-1 min-h-0 gap-4 mt-3">
+                {/* Left: issue form */}
+                <div className="flex-1 flex flex-col gap-4 overflow-y-auto min-w-0">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">Priority</Label>
-                    <Select
-                      value={editForm.priority ?? 'Medium'}
-                      onValueChange={(v) =>
-                        setEditForm((f) => ({ ...f, priority: v as WorkItemPriority }))
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PRIORITIES.map((p) => (
-                          <SelectItem key={p} value={p}>
-                            {p}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="edit-title" className="text-xs font-medium text-muted-foreground">
+                      Summary
+                    </Label>
+                    <Input
+                      id="edit-title"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                      placeholder="Enter a short summary"
+                      className="text-base font-medium"
+                    />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">Depends on</Label>
+                    <Label htmlFor="edit-description" className="text-xs font-medium text-muted-foreground">
+                      Description
+                    </Label>
+                    <Textarea
+                      id="edit-description"
+                      value={editForm.description ?? ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                      placeholder="Describe the issue in more detail…"
+                      rows={6}
+                      className="resize-none min-h-[120px] max-h-[200px] overflow-y-auto"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Assignee</Label>
                     <Select
-                      value={editForm.depends_on ?? ''}
+                      value={editForm.assigned_to ?? ''}
                       onValueChange={(v) =>
-                        setEditForm((f) => ({ ...f, depends_on: v || null }))
+                        setEditForm((f) => ({ ...f, assigned_to: v || null }))
                       }
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="None">
-                          {editForm.depends_on
-                            ? (workItemsForDependsOn.find((w) => w.id === editForm.depends_on)?.title ?? '—')
+                        <SelectValue placeholder="Unassigned">
+                          {editForm.assigned_to
+                            ? (agents.find((a) => a.id === editForm.assigned_to)?.name ?? 'Unassigned')
                             : undefined}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
-                        {workItemsForDependsOn.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.title}
+                        <SelectItem value="">Unassigned</SelectItem>
+                        {agents.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground">Priority</Label>
+                      <Select
+                        value={editForm.priority ?? 'Medium'}
+                        onValueChange={(v) =>
+                          setEditForm((f) => ({ ...f, priority: v as WorkItemPriority }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRIORITIES.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground">Depends on</Label>
+                      <Select
+                        value={editForm.depends_on ?? ''}
+                        onValueChange={(v) =>
+                          setEditForm((f) => ({ ...f, depends_on: v || null }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="None">
+                            {editForm.depends_on
+                              ? (workItemsForDependsOn.find((w) => w.id === editForm.depends_on)?.title ?? '—')
+                              : undefined}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {workItemsForDependsOn.map((w) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-border p-3">
+                    <Label htmlFor="edit-require-approval" className="text-sm font-medium cursor-pointer">
+                      Require approval before starting
+                    </Label>
+                    <Switch
+                      id="edit-require-approval"
+                      checked={editForm.require_approval ?? false}
+                      onCheckedChange={(checked) =>
+                        setEditForm((f) => ({ ...f, require_approval: checked ?? false }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2 border-t border-border pt-4">
+                    <Label className="text-xs font-medium text-muted-foreground">Linked assets</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {linkedAssetIds.map((assetId) => {
+                        const asset = projectAssets.find((a) => a.id === assetId)
+                        return (
+                          <span
+                            key={assetId}
+                            className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-1 text-xs"
+                          >
+                            {asset?.name ?? assetId.slice(0, 8)}
+                            <button
+                              type="button"
+                              className="rounded p-0.5 hover:bg-muted"
+                              onClick={() =>
+                                setLinkedAssetIds((prev) => prev.filter((id) => id !== assetId))
+                              }
+                              aria-label={`Remove ${asset?.name ?? 'asset'}`}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        )
+                      })}
+                      {projectAssets.filter((a) => !linkedAssetIds.includes(a.id)).length > 0 && (
+                        <Select
+                          value={addAssetSelectValue}
+                          onValueChange={(value) => {
+                            if (value) {
+                              setLinkedAssetIds((prev) => [...prev, value])
+                              setAddAssetSelectValue('')
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-auto h-8 min-w-[120px]">
+                            <SelectValue placeholder="Add asset…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projectAssets
+                              .filter((a) => !linkedAssetIds.includes(a.id))
+                              .map((a) => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  {a.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                    {linkedAssetIds.length === 0 && projectAssets.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No assets in this project yet. Add assets from the Assets page.</p>
+                    )}
+                  </div>
+
+                  {editError && (
+                    <p className="text-sm text-destructive">{editError}</p>
+                  )}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={handleArchiveWorkItem}
+                      disabled={archiveSubmitting || editSubmitting}
+                    >
+                      {archiveSubmitting ? 'Archiving…' : 'Archive'}
+                    </Button>
+                    <div className="flex gap-2">
+                      <DialogClose
+                        className="inline-flex h-8 items-center justify-center rounded-lg border border-input bg-background px-2.5 text-sm font-medium hover:bg-muted hover:text-foreground"
+                        disabled={editSubmitting || archiveSubmitting}
+                      >
+                        Cancel
+                      </DialogClose>
+                      <Button
+                        type="button"
+                        onClick={submitEditWorkItem}
+                        disabled={editSubmitting || archiveSubmitting || !editForm.title.trim()}
+                      >
+                        {editSubmitting ? 'Saving…' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-border p-3">
-                  <Label htmlFor="edit-require-approval" className="text-sm font-medium cursor-pointer">
-                    Require Approval
-                  </Label>
-                  <Switch
-                    id="edit-require-approval"
-                    checked={editForm.require_approval ?? false}
-                    onCheckedChange={(checked) =>
-                      setEditForm((f) => ({ ...f, require_approval: checked ?? false }))
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2 border-t border-border pt-4">
-                  <Label className="text-xs font-medium text-muted-foreground">Comments</Label>
-                  <div className="flex flex-col gap-3">
+                {/* Right: comments */}
+                <div className="w-80 flex-shrink-0 flex flex-col border-l border-border pl-4 min-h-0">
+                  <Label className="text-xs font-medium text-muted-foreground mb-2">Comments</Label>
+                  <div className="flex-1 flex flex-col gap-3 overflow-y-auto min-h-0">
                     {editingWorkItem.comments.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No comments yet.</p>
                     ) : (
@@ -1026,53 +1380,51 @@ export function ProjectPage() {
                         ))}
                       </ul>
                     )}
-                    <div className="flex flex-col gap-2">
-                      <Textarea
-                        placeholder="Add a comment…"
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        rows={2}
-                        className="resize-y min-h-[60px]"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={submitComment}
-                        disabled={!newComment.trim() || commentSubmitting}
-                        className="w-fit"
-                      >
-                        {commentSubmitting ? 'Sending…' : 'Add comment'}
-                      </Button>
-                    </div>
                   </div>
-                </div>
-
-                {editError && (
-                  <p className="text-sm text-destructive">{editError}</p>
-                )}
-                <div className="flex items-center justify-between gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={handleArchiveWorkItem}
-                    disabled={archiveSubmitting || editSubmitting}
-                  >
-                    {archiveSubmitting ? 'Archiving…' : 'Archive'}
-                  </Button>
-                  <div className="flex gap-2">
-                    <DialogClose
-                      className="inline-flex h-8 items-center justify-center rounded-lg border border-input bg-background px-2.5 text-sm font-medium hover:bg-muted hover:text-foreground"
-                      disabled={editSubmitting || archiveSubmitting}
-                    >
-                      Cancel
-                    </DialogClose>
+                  <div className="flex flex-col gap-2 pt-3 border-t border-border mt-2">
+                    <div className="relative">
+                      <Textarea
+                        ref={commentTextareaRef}
+                        placeholder="Add a comment… (type @ to mention an agent)"
+                        value={newComment}
+                        onChange={handleCommentChange}
+                        onKeyDown={handleCommentKeyDown}
+                        rows={2}
+                        className="resize-none min-h-[60px] max-h-[120px] overflow-y-auto"
+                      />
+                      {mentionDropdown.show && (
+                        <div
+                          className="absolute z-10 left-0 right-0 top-full mt-1 rounded-md border border-border bg-popover shadow-md max-h-[180px] overflow-y-auto"
+                          role="listbox"
+                        >
+                          {filteredAgentsForMention.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                              No agents match
+                            </div>
+                          ) : (
+                            filteredAgentsForMention.map((agent) => (
+                              <button
+                                key={agent.id}
+                                type="button"
+                                role="option"
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-muted focus:bg-muted focus:outline-none"
+                                onClick={() => selectMentionAgent(agent)}
+                              >
+                                {agent.name}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <Button
                       type="button"
-                      onClick={submitEditWorkItem}
-                      disabled={editSubmitting || archiveSubmitting || !editForm.title.trim()}
+                      size="sm"
+                      onClick={submitComment}
+                      disabled={!newComment.trim() || commentSubmitting}
+                      className="w-fit"
                     >
-                      {editSubmitting ? 'Saving…' : 'Save'}
+                      {commentSubmitting ? 'Sending…' : 'Add comment'}
                     </Button>
                   </div>
                 </div>

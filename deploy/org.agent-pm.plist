@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>org.agent-pm</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>REPLACE_WITH_PROJECT_PATH/node_modules/.bin/tsx</string>
+		<string>server/index.ts</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>REPLACE_WITH_PROJECT_PATH</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PORT</key>
+		<string>38472</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>REPLACE_WITH_PROJECT_PATH/deploy/agent-pm.log</string>
+	<key>StandardErrorPath</key>
+	<string>REPLACE_WITH_PROJECT_PATH/deploy/agent-pm.log</string>
+</dict>
+</plist>

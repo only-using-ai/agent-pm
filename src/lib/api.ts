@@ -1,5 +1,5 @@
 const API_BASE =
-  (import.meta.env?.VITE_API_URL as string | undefined) || 'http://localhost:3001'
+  (import.meta.env?.VITE_API_URL as string | undefined) || 'http://localhost:38472'
 
 export function getApiBase(): string {
   return API_BASE.replace(/\/$/, '')
@@ -11,6 +11,7 @@ export type Project = {
   priority: string | null
   description: string | null
   path: string | null
+  project_context: string | null
   created_at: string
   archived_at?: string | null
 }
@@ -53,6 +54,7 @@ export type UpdateProjectBody = {
   priority?: string | null
   description?: string | null
   path?: string | null
+  project_context?: string | null
 }
 
 export async function updateProject(id: string, body: UpdateProjectBody): Promise<Project> {
@@ -129,6 +131,7 @@ export async function createProjectColumn(
 export type UpdateProjectColumnBody = {
   title?: string
   color?: string
+  position?: number
 }
 
 export async function updateProjectColumn(
@@ -192,9 +195,13 @@ export type WorkItemComment = {
   author_id: string | null
   body: string
   created_at: string
+  mentioned_agent_ids?: string[]
 }
 
-export type WorkItemWithComments = WorkItem & { comments: WorkItemComment[] }
+export type WorkItemWithComments = WorkItem & {
+  comments: WorkItemComment[]
+  asset_ids?: string[]
+}
 
 export type WorkItemWithProject = WorkItem & { project_name: string }
 
@@ -235,6 +242,7 @@ export type CreateWorkItemBody = {
   /** Column id (defaults to 'todo' if not provided) */
   status?: string
   require_approval?: boolean
+  asset_ids?: string[]
 }
 
 export async function createWorkItem(projectId: string, body: CreateWorkItemBody): Promise<WorkItem> {
@@ -259,6 +267,7 @@ export type UpdateWorkItemBody = Partial<{
   /** Column id when moving between columns */
   status: string
   require_approval: boolean
+  asset_ids: string[]
 }>
 
 export async function updateWorkItem(
@@ -293,7 +302,11 @@ export async function addWorkItemComment(
   projectId: string,
   workItemId: string,
   body: string,
-  options?: { author_type: 'user' | 'agent'; author_id?: string | null }
+  options?: {
+    author_type?: 'user' | 'agent'
+    author_id?: string | null
+    mentioned_agent_ids?: string[]
+  }
 ): Promise<WorkItemComment> {
   const res = await fetch(`${getApiBase()}/api/projects/${projectId}/work-items/${workItemId}/comments`, {
     method: 'POST',
@@ -302,6 +315,7 @@ export async function addWorkItemComment(
       body,
       author_type: options?.author_type ?? 'user',
       author_id: options?.author_id ?? null,
+      mentioned_agent_ids: options?.mentioned_agent_ids ?? [],
     }),
   })
   if (!res.ok) {
@@ -443,4 +457,222 @@ export async function deleteContextFile(name: string): Promise<void> {
     const err = await res.json().catch(() => ({}))
     throw new Error((err as { error?: string }).error ?? 'Failed to delete file')
   }
+}
+
+// Project directory tree (filesystem)
+export type FileSystemTreeNode = {
+  id: string
+  name: string
+  path: string
+  type: 'file' | 'folder'
+  children: FileSystemTreeNode[]
+}
+
+export async function listProjectFiles(
+  projectId: string
+): Promise<{ tree: FileSystemTreeNode[] }> {
+  const res = await fetch(`${getApiBase()}/api/projects/${projectId}/files`)
+  if (!res.ok) throw new Error('Failed to list project files')
+  return res.json()
+}
+
+export async function getProjectFileContent(
+  projectId: string,
+  filePath: string
+): Promise<{ content: string }> {
+  const res = await fetch(
+    `${getApiBase()}/api/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to read file')
+  }
+  return res.json()
+}
+
+export async function updateProjectFileContent(
+  projectId: string,
+  filePath: string,
+  content: string
+): Promise<{ content: string }> {
+  const res = await fetch(
+    `${getApiBase()}/api/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    }
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to write file')
+  }
+  return res.json()
+}
+
+export async function deleteProjectFile(
+  projectId: string,
+  filePath: string
+): Promise<void> {
+  const res = await fetch(
+    `${getApiBase()}/api/projects/${projectId}/files?path=${encodeURIComponent(filePath)}`,
+    { method: 'DELETE' }
+  )
+  if (!res.ok && res.status !== 204) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to delete file')
+  }
+}
+
+// Assets (per project, tree follows project base path)
+export type AssetType = 'file' | 'link' | 'folder'
+export type Asset = {
+  id: string
+  project_id: string
+  parent_id: string | null
+  name: string
+  type: AssetType
+  path: string | null
+  url: string | null
+  created_at: string
+}
+export type AssetTreeNode = Asset & { children: AssetTreeNode[] }
+
+export async function listAssets(projectId: string): Promise<{ flat: Asset[]; tree: AssetTreeNode[] }> {
+  const res = await fetch(`${getApiBase()}/api/projects/${projectId}/assets`)
+  if (!res.ok) throw new Error('Failed to list assets')
+  return res.json()
+}
+
+export async function getAsset(projectId: string, assetId: string): Promise<Asset | null> {
+  const res = await fetch(`${getApiBase()}/api/projects/${projectId}/assets/${assetId}`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error('Failed to fetch asset')
+  return res.json()
+}
+
+export type CreateAssetBody = {
+  name: string
+  type: AssetType
+  parent_id?: string | null
+  path?: string | null
+  url?: string | null
+  work_item_ids?: string[]
+}
+
+export async function createAsset(projectId: string, body: CreateAssetBody): Promise<Asset> {
+  const res = await fetch(`${getApiBase()}/api/projects/${projectId}/assets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to create asset')
+  }
+  return res.json()
+}
+
+export type UpdateAssetBody = Partial<{
+  name: string
+  type: AssetType
+  parent_id: string | null
+  path: string | null
+  url: string | null
+}>
+
+export async function updateAsset(
+  projectId: string,
+  assetId: string,
+  body: UpdateAssetBody
+): Promise<Asset> {
+  const res = await fetch(`${getApiBase()}/api/projects/${projectId}/assets/${assetId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to update asset')
+  }
+  return res.json()
+}
+
+export async function deleteAsset(projectId: string, assetId: string): Promise<void> {
+  const res = await fetch(`${getApiBase()}/api/projects/${projectId}/assets/${assetId}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok && res.status !== 204) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to delete asset')
+  }
+}
+
+// Profile (current user)
+export type Profile = {
+  first_name: string
+  last_name: string
+  avatar_url: string | null
+}
+
+export async function getProfile(): Promise<Profile> {
+  const res = await fetch(`${getApiBase()}/api/profile`)
+  if (!res.ok) throw new Error('Failed to load profile')
+  return res.json()
+}
+
+export type UpdateProfileBody = {
+  first_name?: string
+  last_name?: string
+}
+
+export async function updateProfile(body: UpdateProfileBody): Promise<Profile> {
+  const res = await fetch(`${getApiBase()}/api/profile`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to update profile')
+  }
+  return res.json()
+}
+
+export async function uploadProfileAvatar(file: File): Promise<Profile> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`${getApiBase()}/api/profile/avatar`, {
+    method: 'POST',
+    body: form,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to upload avatar')
+  }
+  return res.json()
+}
+
+export function getProfileAvatarUrl(): string {
+  return `${getApiBase()}/api/profile/avatar`
+}
+
+export async function linkAssetToWorkItem(
+  projectId: string,
+  workItemId: string,
+  assetId: string
+): Promise<{ linked: boolean }> {
+  const res = await fetch(
+    `${getApiBase()}/api/projects/${projectId}/work-items/${workItemId}/assets`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asset_id: assetId }),
+    }
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to link asset to work item')
+  }
+  return res.json()
 }

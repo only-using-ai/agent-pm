@@ -26,6 +26,7 @@ export {
   buildContextForWorkItemCreated,
   buildContextForWorkItemAssignmentChange,
   buildContextForWorkItemApproved,
+  buildContextForWorkItemCommented,
 } from './event-prompts.js'
 export { runAgentStream, runAgent } from './langchain-runner.js'
 export { createModel } from './langchain-model.js'

@@ -10,6 +10,7 @@ import { McpProvider } from '@/contexts/mcp-context'
 import { ProjectsProvider } from '@/contexts/projects-context'
 import { AddAgentPage } from '@/pages/add-agent'
 import { AgentPage } from '@/pages/agent'
+import { AssetsPage } from '@/pages/assets'
 import { ContextPage } from '@/pages/context'
 import { DashboardPage } from '@/pages/dashboard'
 import { InboxPage } from '@/pages/inbox'
@@ -39,6 +40,7 @@ function App() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/work-items" element={<WorkItemsPage />} />
+            <Route path="/assets" element={<AssetsPage />} />
             <Route path="/context" element={<ContextPage />} />
             <Route path="/inbox" element={<InboxPage />} />
             <Route path="/agents/new" element={<AddAgentPage />} />

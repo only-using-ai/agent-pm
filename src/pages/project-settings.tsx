@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import MDEditor, { commands } from '@uiw/react-md-editor'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -15,12 +16,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getProject, updateProject, archiveProject } from '@/lib/api'
 import { useProjects } from '@/contexts/projects-context'
+import { useTheme } from '@/contexts/theme-context'
 import type { Project } from '@/lib/api'
 
 export function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { refetch } = useProjects()
+  const { effectiveTheme } = useTheme()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,6 +35,10 @@ export function ProjectSettingsPage() {
   const [pathValue, setPathValue] = useState('')
   const [savingPath, setSavingPath] = useState(false)
   const [pathError, setPathError] = useState<string | null>(null)
+  const [contextValue, setContextValue] = useState('')
+  const [savingContext, setSavingContext] = useState(false)
+  const [contextError, setContextError] = useState<string | null>(null)
+  const [contextSaved, setContextSaved] = useState(false)
 
   useEffect(() => {
     if (!projectId) return
@@ -45,6 +52,7 @@ export function ProjectSettingsPage() {
           if (p) {
             setNameValue(p.name)
             setPathValue(p.path ?? '')
+            setContextValue(p.project_context ?? '')
           }
         }
       })
@@ -108,6 +116,26 @@ export function ProjectSettingsPage() {
       setPathError(e instanceof Error ? e.message : 'Failed to save path')
     } finally {
       setSavingPath(false)
+    }
+  }
+
+  const handleSaveContext = async () => {
+    if (!projectId || !project) return
+    const nextContext = contextValue.trim() || ''
+    if ((project.project_context ?? '') === nextContext) return
+    setContextError(null)
+    setContextSaved(false)
+    setSavingContext(true)
+    try {
+      const updated = await updateProject(projectId, { project_context: nextContext || null })
+      setProject(updated)
+      await refetch()
+      setContextSaved(true)
+      setTimeout(() => setContextSaved(false), 2000)
+    } catch (e) {
+      setContextError(e instanceof Error ? e.message : 'Failed to save context')
+    } finally {
+      setSavingContext(false)
     }
   }
 
@@ -227,6 +255,42 @@ export function ProjectSettingsPage() {
               </Button>
             </div>
             {pathError && <p className="text-sm text-destructive">{pathError}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="project-context">Additional context</Label>
+            <p className="text-sm text-muted-foreground">
+              Markdown content included in the agent prompt for this project. Use the variable &apos;PROJECT_CONTEXT&apos; in the Agent System Prompt (Settings → Prompts) to inject this content.
+            </p>
+            <div
+              data-color-mode={effectiveTheme}
+              className="overflow-hidden rounded-md border border-input [&_.w-md-editor]:min-h-[200px] [&_.w-md-editor-toolbar]:rounded-t-md [&_.w-md-editor-content]:rounded-b-md"
+            >
+              <MDEditor
+                id="project-context"
+                value={contextValue}
+                onChange={(val) => setContextValue(val ?? '')}
+                height={200}
+                visibleDragbar={false}
+                preview="edit"
+                commands={[commands.codeEdit, commands.codePreview]}
+                extraCommands={[]}
+                textareaProps={{
+                  disabled: savingContext,
+                }}
+              />
+            </div>
+            {contextError && <p className="text-sm text-destructive">{contextError}</p>}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleSaveContext}
+                disabled={savingContext || (project.project_context ?? '') === contextValue.trim()}
+              >
+                {savingContext ? 'Saving…' : 'Save context'}
+              </Button>
+              {contextSaved && (
+                <span className="text-sm text-muted-foreground">Saved.</span>
+              )}
+            </div>
           </div>
           <div>
             <h3 className="text-sm font-medium text-muted-foreground">Danger zone</h3>

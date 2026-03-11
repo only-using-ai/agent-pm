@@ -18,11 +18,14 @@ export type AgentStreamChunk =
 export type WorkItemAssignmentChangeHandlerDeps = {
   getPool: () => Pool
   getAgentById: (pool: Pool, id: string) => Promise<AgentRow | null>
+  getProjectById: (pool: Pool, id: string) => Promise<{ project_context?: string | null } | null>
   getPromptByKey: (pool: Pool, key: string) => Promise<{ content: string } | null>
+  /** Contents of the Context tab markdown (.agent-pm/context.md). */
+  getContextContent: () => Promise<string>
   buildContextForWorkItemAssignmentChange: (
     agent: AgentRecordLike,
     payload: WorkItemAssignmentChangePayload,
-    options?: { template?: string | null }
+    options?: { template?: string | null; areaContext?: string; projectContext?: string }
   ) => unknown
   getInitialMessages: (agent: AgentRecordLike, context: unknown) => unknown[]
   runAgentStream: (
@@ -89,7 +92,9 @@ export function createWorkItemAssignmentChangeHandler(
   const {
     getPool,
     getAgentById,
+    getProjectById,
     getPromptByKey,
+    getContextContent,
     buildContextForWorkItemAssignmentChange,
     getInitialMessages,
     runAgentStream,
@@ -118,9 +123,15 @@ export function createWorkItemAssignmentChangeHandler(
     if (!agent) return
 
     try {
-      const promptContent = await getPromptByKey(pool, 'agent_system_prompt')
+      const [promptContent, areaContext, project] = await Promise.all([
+        getPromptByKey(pool, 'agent_system_prompt'),
+        getContextContent(),
+        getProjectById(pool, payload.project_id),
+      ])
       const context = buildContextForWorkItemAssignmentChange(agent, payload, {
         template: promptContent?.content ?? null,
+        areaContext,
+        projectContext: project?.project_context ?? '',
       })
       broadcaster.broadcastToAgent(agentId, 'stream_start', {
         work_item_id: payload.id,

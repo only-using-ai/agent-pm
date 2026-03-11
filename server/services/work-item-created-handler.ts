@@ -20,12 +20,15 @@ export type AgentStreamChunk =
 export type WorkItemCreatedHandlerDeps = {
   getPool: () => Pool
   getAgentById: (pool: Pool, id: string) => Promise<AgentRow | null>
+  getProjectById: (pool: Pool, id: string) => Promise<{ project_context?: string | null } | null>
   getPromptByKey: (pool: Pool, key: string) => Promise<{ content: string } | null>
+  /** Contents of the Context tab markdown (.agent-pm/context.md). */
+  getContextContent: () => Promise<string>
   /** (agent, payload, options?) => context; options.template is the prompt content from DB when provided. */
   buildContextForWorkItemCreated: (
     agent: AgentRecordLike,
     payload: PayloadLike,
-    options?: { template?: string | null }
+    options?: { template?: string | null; areaContext?: string; projectContext?: string }
   ) => unknown
   /** Returns initial messages for the agent (system + user). */
   getInitialMessages: (agent: AgentRecordLike, context: unknown) => unknown[]
@@ -95,7 +98,9 @@ export function createWorkItemCreatedHandler(
   const {
     getPool,
     getAgentById,
+    getProjectById,
     getPromptByKey,
+    getContextContent,
     buildContextForWorkItemCreated,
     getInitialMessages,
     runAgentStream,
@@ -117,6 +122,9 @@ export function createWorkItemCreatedHandler(
 
   return async (payload: WorkItemCreatedPayload): Promise<void> => {
     if (!payload.assigned_to) return
+    // When approval is required before starting, an inbox item is created by the server.
+    // Do not run the agent here; it will start when the user approves from the Inbox.
+    if (payload.require_approval) return
 
     const agentId = payload.assigned_to
     const pool = getPool()
@@ -124,9 +132,15 @@ export function createWorkItemCreatedHandler(
     if (!agent) return
 
     try {
-      const promptContent = await getPromptByKey(pool, 'agent_system_prompt')
+      const [promptContent, areaContext, project] = await Promise.all([
+        getPromptByKey(pool, 'agent_system_prompt'),
+        getContextContent(),
+        getProjectById(pool, payload.project_id),
+      ])
       const context = buildContextForWorkItemCreated(agent, payload, {
         template: promptContent?.content ?? null,
+        areaContext,
+        projectContext: project?.project_context ?? '',
       })
       broadcaster.broadcastToAgent(agentId, 'stream_start', {
         work_item_id: payload.id,

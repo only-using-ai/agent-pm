@@ -14,6 +14,7 @@ import {
 } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAgents } from '@/contexts/agents-context'
+import { useInbox } from '@/contexts/inbox-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -76,6 +77,7 @@ const defaultCreateForm: CreateForm = {
 
 export function WorkItemsPage() {
   const { agents } = useAgents()
+  const { refetch: refetchInbox } = useInbox()
   const location = useLocation()
   const navigate = useNavigate()
   const [items, setItems] = useState<WorkItemWithProject[]>([])
@@ -128,14 +130,26 @@ export function WorkItemsPage() {
     setCreateModalOpen(true)
   }, [])
 
-  // Open create modal when navigated from dashboard with state.openCreate
+  // Open create modal when navigated with state.openCreate (e.g. from dashboard or assets page)
   useEffect(() => {
-    const state = location.state as { openCreate?: boolean } | null
+    const state = location.state as {
+      openCreate?: boolean
+      title?: string
+      description?: string
+      project_id?: string
+    } | null
     if (state?.openCreate && !loading) {
-      openCreateModal()
+      setCreateForm((_prev) => ({
+        ...defaultCreateForm,
+        ...(state.title != null && { title: state.title }),
+        ...(state.description != null && { description: state.description }),
+        ...(state.project_id != null && { project_id: state.project_id }),
+      }))
+      setCreateError(null)
+      setCreateModalOpen(true)
       navigate('/work-items', { replace: true, state: {} })
     }
-  }, [location.state, loading, openCreateModal, navigate])
+  }, [location.state, loading, navigate])
 
   const submitCreateWorkItem = useCallback(async () => {
     if (!createForm.project_id || !createForm.title.trim()) return
@@ -157,12 +171,13 @@ export function WorkItemsPage() {
         ...prev,
       ])
       setCreateModalOpen(false)
+      if (createForm.require_approval) await refetchInbox()
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : 'Failed to create work item')
     } finally {
       setCreateSubmitting(false)
     }
-  }, [createForm, projects])
+  }, [createForm, projects, refetchInbox])
 
   if (loading) {
     return (
@@ -397,17 +412,24 @@ export function WorkItemsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-border p-3">
-                <Label htmlFor="create-require-approval" className="text-sm font-medium cursor-pointer">
-                  Require Approval
-                </Label>
-                <Switch
-                  id="create-require-approval"
-                  checked={createForm.require_approval}
-                  onCheckedChange={(checked) =>
-                    setCreateForm((f) => ({ ...f, require_approval: checked ?? false }))
-                  }
-                />
+              <div className="space-y-1 rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="create-require-approval" className="text-sm font-medium cursor-pointer">
+                    Require approval before starting
+                  </Label>
+                  <Switch
+                    id="create-require-approval"
+                    checked={createForm.require_approval}
+                    onCheckedChange={(checked) =>
+                      setCreateForm((f) => ({ ...f, require_approval: checked ?? false }))
+                    }
+                  />
+                </div>
+                {createForm.require_approval && (
+                  <p className="text-xs text-muted-foreground">
+                    Item will appear in Inbox; the agent starts after you approve.
+                  </p>
+                )}
               </div>
               {createError && (
                 <p className="text-sm text-destructive">{createError}</p>

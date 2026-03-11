@@ -19,6 +19,22 @@ export interface WorkItemCreatedPayload {
   [key: string]: unknown
 }
 
+/** Work item with comments array for work_item.commented context. */
+export interface WorkItemWithCommentsForPrompt {
+  id: string
+  project_id: string
+  title: string | null
+  description?: string | null
+  priority?: string | null
+  status?: string | null
+  comments: Array<{
+    author_type: string
+    author_id: string | null
+    body: string
+    created_at: string
+  }>
+}
+
 /** Same shape as work item row; used for assignment_change event. */
 export interface WorkItemAssignmentChangePayload {
   id: string
@@ -52,15 +68,20 @@ Actions (use the exact tool name and JSON):
 - __AGENT_ACTION__ request_for_approval {"text":"What you are asking approval for","work_item_id":"<WORK_ITEM_ID>","agent_name":"Your agent name"}  Use this when the work item requires approval (Require Approval is true). Wait for the user to Approve or Reject in the Inbox before continuing with tasks.
 - __AGENT_ACTION__ request_info {"message":"What you need from the user","work_item_id":"<WORK_ITEM_ID>","agent_name":"Your agent name"}
 - __AGENT_ACTION__ list_available_agents {}  (call first if you need to create and assign a work item)
-- __AGENT_ACTION__ create_work_item_and_assign {"title":"...","assigned_to_agent_id":"<agent_id>","description":"...","priority":"Medium","depends_on":"<work_item_id>"}`
+- __AGENT_ACTION__ create_work_item_and_assign {"title":"...","assigned_to_agent_id":"<agent_id>","description":"...","priority":"Medium","depends_on":"<work_item_id>"}
+- __AGENT_ACTION__ link_asset_to_work_item {"asset_id":"<asset_uuid>"}  Link an existing asset to the current work item.
+- __AGENT_ACTION__ create_asset_and_link_to_work_item {"name":"...","type":"file","path":"..."}  Create a new asset (e.g. for a file you just created) and link it to the current work item. type: file, link, or folder; path optional for files; url optional for links.`
 
 /**
  * Build the variable map for work-item-created prompt substitution.
  * Use these keys in templates as 'WORK_ITEM_TITLE', 'AGENT_PROVIDER', etc.
+ * areaContext: contents of the Context tab markdown (AREA_CONTEXT).
+ * projectContext: project-specific context from project settings (PROJECT_CONTEXT).
  */
 export function getWorkItemCreatedPromptVariables(
   agent: AgentRecord,
-  payload: WorkItemCreatedPayload
+  payload: WorkItemCreatedPayload,
+  options?: { areaContext?: string; projectContext?: string }
 ): Record<string, string> {
   const isCursor = (agent.ai_provider ?? '').toLowerCase() === 'cursor'
   const cursorBlock = isCursor ? CURSOR_ACTIONS_INSTRUCTIONS : ''
@@ -75,6 +96,60 @@ export function getWorkItemCreatedPromptVariables(
     AGENT_INSTRUCTIONS: agent.instructions?.trim() ?? 'Assist the user.',
     AGENT_PROVIDER: (agent.ai_provider ?? 'ollama').toLowerCase(),
     CURSOR_ACTIONS_BLOCK: cursorBlock,
+    AREA_CONTEXT: options?.areaContext ?? '',
+    PROJECT_CONTEXT: options?.projectContext ?? '',
+  }
+}
+
+/**
+ * Format all work item comments into a single string for WORK_ITEM_COMMENTS.
+ * agentNames: optional map of agent_id -> name for comment authors.
+ */
+export function formatWorkItemComments(
+  comments: WorkItemWithCommentsForPrompt['comments'],
+  agentNames?: Map<string, string>
+): string {
+  if (!comments?.length) return 'No comments yet.'
+  return comments
+    .map((c) => {
+      const date = new Date(c.created_at).toISOString().replace('T', ' ').slice(0, 19)
+      const author =
+        c.author_type === 'agent' && c.author_id && agentNames?.get(c.author_id)
+          ? agentNames.get(c.author_id)
+          : c.author_type === 'agent'
+            ? 'Agent'
+            : 'User'
+      return `${author} (${date}): ${(c.body ?? '').trim()}`
+    })
+    .join('\n')
+}
+
+/**
+ * Build the variable map for work_item.commented prompt substitution.
+ * Includes WORK_ITEM_COMMENTS (all comments on the work item).
+ */
+export function getWorkItemCommentedPromptVariables(
+  agent: AgentRecord,
+  workItem: WorkItemWithCommentsForPrompt,
+  options?: { areaContext?: string; projectContext?: string; agentNames?: Map<string, string> }
+): Record<string, string> {
+  const commentsText = formatWorkItemComments(workItem.comments ?? [], options?.agentNames)
+  const isCursor = (agent.ai_provider ?? '').toLowerCase() === 'cursor'
+  const cursorBlock = isCursor ? CURSOR_ACTIONS_INSTRUCTIONS : ''
+  return {
+    WORK_ITEM_ID: workItem.id,
+    WORK_ITEM_TITLE: workItem.title?.trim() || 'Untitled',
+    WORK_ITEM_DESCRIPTION: workItem.description?.trim() || 'None',
+    WORK_ITEM_PRIORITY: workItem.priority ?? 'Medium',
+    WORK_ITEM_STATUS: workItem.status ?? 'todo',
+    WORK_ITEM_REQUIRE_APPROVAL: 'false',
+    WORK_ITEM_COMMENTS: commentsText,
+    PROJECT_ID: workItem.project_id,
+    AGENT_INSTRUCTIONS: agent.instructions?.trim() ?? 'Assist the user.',
+    AGENT_PROVIDER: (agent.ai_provider ?? 'ollama').toLowerCase(),
+    CURSOR_ACTIONS_BLOCK: cursorBlock,
+    AREA_CONTEXT: options?.areaContext ?? '',
+    PROJECT_CONTEXT: options?.projectContext ?? '',
   }
 }
 
@@ -86,14 +161,17 @@ export function getWorkItemCreatedPromptVariables(
 export function buildContextForWorkItemCreated(
   agent: AgentRecord,
   payload: WorkItemCreatedPayload,
-  options?: { template?: string | null }
+  options?: { template?: string | null; areaContext?: string; projectContext?: string }
 ): AgentContext {
   const userMessage =
     options?.template != null && options.template !== ''
       ? substitutePromptVariables(
-          options.template,
-          getWorkItemCreatedPromptVariables(agent, payload)
-        )
+        options.template,
+        getWorkItemCreatedPromptVariables(agent, payload, {
+          areaContext: options?.areaContext,
+          projectContext: options?.projectContext,
+        })
+      )
       : buildWorkItemCreatedUserMessage(agent, payload)
   return {
     userMessage,
@@ -157,14 +235,17 @@ function buildWorkItemCreatedUserMessage(
 export function buildContextForWorkItemAssignmentChange(
   agent: AgentRecord,
   payload: WorkItemAssignmentChangePayload,
-  options?: { template?: string | null }
+  options?: { template?: string | null; areaContext?: string; projectContext?: string }
 ): AgentContext {
   const userMessage =
     options?.template != null && options.template !== ''
       ? substitutePromptVariables(
-          options.template,
-          getWorkItemCreatedPromptVariables(agent, payload as WorkItemCreatedPayload)
-        )
+        options.template,
+        getWorkItemCreatedPromptVariables(agent, payload as WorkItemCreatedPayload, {
+          areaContext: options?.areaContext,
+          projectContext: options?.projectContext,
+        })
+      )
       : buildWorkItemAssignmentChangeUserMessage(agent, payload)
   return {
     userMessage,
@@ -215,6 +296,51 @@ function buildWorkItemAssignmentChangeUserMessage(
     parts.push(CURSOR_ACTIONS_INSTRUCTIONS)
   }
   return parts.filter(Boolean).join(' ')
+}
+
+/**
+ * Build agent context for the "work_item.commented" event (agent was @-mentioned in a comment).
+ * Uses WORK_ITEM_COMMENTS in variables. If options.template is provided, substitutes variables; otherwise uses built-in message.
+ */
+export function buildContextForWorkItemCommented(
+  agent: AgentRecord,
+  workItem: WorkItemWithCommentsForPrompt,
+  options?: { template?: string | null; areaContext?: string; projectContext?: string; agentNames?: Map<string, string> }
+): AgentContext {
+  const variables = getWorkItemCommentedPromptVariables(agent, workItem, {
+    areaContext: options?.areaContext,
+    projectContext: options?.projectContext,
+    agentNames: options?.agentNames,
+  })
+  const userMessage =
+    options?.template != null && options.template !== ''
+      ? substitutePromptVariables(options.template, variables)
+      : [
+        `You are an AI agent. Your role is: ${agent.instructions?.trim() ?? 'Assist the user.'}`,
+        `You were @-mentioned in a comment on the work item "${workItem.title?.trim() || 'Untitled'}".`,
+        'Here are all comments on this work item (most recent at the end):',
+        '---',
+        variables.WORK_ITEM_COMMENTS,
+        '---',
+        'Process the work item and the comments: understand what was asked, use update_work_item_status and add_work_item_comment as needed, and complete or progress the work item. Be concise unless otherwise instructed.',
+      ].join('\n')
+  return {
+    userMessage,
+    context: {
+      work_item: {
+        id: workItem.id,
+        title: workItem.title,
+        description: workItem.description,
+        priority: workItem.priority,
+        status: workItem.status,
+      },
+    },
+    variables: {
+      work_item_title: workItem.title ?? '',
+      work_item_id: workItem.id,
+      project_id: workItem.project_id,
+    },
+  }
 }
 
 /** Payload for work_item.approved: approval request row fields needed to resume the agent. */

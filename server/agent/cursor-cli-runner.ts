@@ -1,13 +1,15 @@
 /**
  * Cursor CLI runner: runs the Cursor Agent via the local CLI instead of the API.
- * Spawns `cursor agent -p --output-format stream-json [--stream-partial-output] --model <id> ...`
- * and parses NDJSON to stream content and tool_call chunks.
+ * Spawns `cursor agent -p --output-format stream-json --stream-partial-output --model <id> ...`
+ * and parses NDJSON to stream content, thinking (when present), and tool_call chunks.
  *
  * Docs: https://cursor.com/docs/cli/headless
  *       https://cursor.com/docs/cli/reference/output-format
  *
- * Note: Cursor docs state that "thinking events are suppressed in print mode and will not
- * appear in any output format" — so we do not stream reasoning/thinking tokens when using the CLI.
+ * Thinking/reasoning: Cursor docs state that "thinking events are suppressed in print mode
+ * and will not appear in any output format". We still parse and stream any content blocks with
+ * type "thinking" or "reasoning" so that if Cursor adds support later, the client will
+ * receive thinking chunks without code changes.
  */
 
 import { spawn } from 'node:child_process'
@@ -92,6 +94,14 @@ function actionKey(toolName: string, args: Record<string, unknown>): string | nu
     const workItemId = typeof args?.work_item_id === 'string' ? args.work_item_id.trim() : ''
     const text = typeof args?.text === 'string' ? args.text.trim() : ''
     return workItemId && text ? `request_for_approval:${workItemId}:${text.slice(0, 50)}` : null
+  }
+  if (toolName === 'link_asset_to_work_item') {
+    const assetId = typeof args?.asset_id === 'string' ? args.asset_id.trim() : ''
+    return assetId ? `link_asset_to_work_item:${assetId}` : null
+  }
+  if (toolName === 'create_asset_and_link_to_work_item') {
+    const name = typeof args?.name === 'string' ? args.name.trim() : ''
+    return name ? `create_asset_and_link_to_work_item:${name}` : null
   }
   return null
 }
@@ -256,6 +266,50 @@ async function* processContentWithActions(
           } else {
             yield { type: 'content', text: '[request_info not available in this context.]\n' }
           }
+        } else if (toolName === 'link_asset_to_work_item') {
+          const assetId = typeof args?.asset_id === 'string' ? args.asset_id.trim() : ''
+          if (!assetId) {
+            yield { type: 'content', text: '[link_asset_to_work_item: asset_id is required.]\n' }
+          } else if (toolContext.linkAssetToWorkItem && !alreadyExecuted) {
+            const { linked } = await toolContext.linkAssetToWorkItem(
+              toolContext.pool,
+              toolContext.projectId,
+              toolContext.workItemId,
+              assetId
+            )
+            toolContext.broadcaster.broadcastToAgent(toolContext.agentId, 'stream_chunk', {
+              chunk: linked ? 'Asset linked to work item.' : 'Asset was already linked.',
+              type: 'content',
+            })
+            yield { type: 'content', text: linked ? '[Asset linked to work item.]\n' : '[Asset was already linked.]\n' }
+          } else if (alreadyExecuted) {
+            yield { type: 'content', text: '[Asset link already applied.]\n' }
+          } else {
+            yield { type: 'content', text: '[link_asset_to_work_item not available in this context.]\n' }
+          }
+        } else if (toolName === 'create_asset_and_link_to_work_item') {
+          const name = typeof args?.name === 'string' ? args.name.trim() : ''
+          if (!name) {
+            yield { type: 'content', text: '[create_asset_and_link_to_work_item: name is required.]\n' }
+          } else if (toolContext.createAsset && !alreadyExecuted) {
+            const type = args?.type === 'file' || args?.type === 'link' || args?.type === 'folder' ? args.type : 'file'
+            const row = await toolContext.createAsset(toolContext.pool, toolContext.projectId, {
+              name,
+              type,
+              path: typeof args?.path === 'string' ? args.path.trim() || null : null,
+              url: typeof args?.url === 'string' ? args.url.trim() || null : null,
+              work_item_ids: [toolContext.workItemId],
+            })
+            toolContext.broadcaster.broadcastToAgent(toolContext.agentId, 'stream_chunk', {
+              chunk: `Asset "${row.name}" created and linked to work item (id: ${row.id}).`,
+              type: 'content',
+            })
+            yield { type: 'content', text: `[Asset "${row.name}" created and linked (id: ${row.id}).]\n` }
+          } else if (alreadyExecuted) {
+            yield { type: 'content', text: '[Asset already created and linked.]\n' }
+          } else {
+            yield { type: 'content', text: '[create_asset_and_link_to_work_item not available in this context.]\n' }
+          }
         } else {
           yield { type: 'content', text: trimmed + '\n' }
         }
@@ -304,7 +358,8 @@ function parseToolCallEvent(event: Record<string, unknown>): { id: string; name:
 /**
  * Run Cursor Agent via CLI and stream NDJSON events as StreamChunk.
  * Uses --output-format stream-json and --stream-partial-output for real-time content deltas.
- * Thinking/reasoning tokens are not available (suppressed in print mode per Cursor docs).
+ * Parses and yields thinking chunks when present; per Cursor docs they are currently
+ * suppressed in print mode, so none may appear until/unless Cursor adds support.
  */
 export async function* runCursorCLIStream(
   messages: ChatMessage[],
@@ -369,11 +424,33 @@ export async function* runCursorCLIStream(
           const event = JSON.parse(trimmed) as Record<string, unknown>
           const type = event.type as string
           if (type === 'assistant') {
-            const msg = event.message as { content?: Array<{ type?: string; text?: string }> } | undefined
+            const msg = event.message as {
+              content?: Array<{
+                type?: string
+                text?: string
+                reasoning?: string
+                thinking?: string
+              }>
+            } | undefined
             const content = msg?.content
             if (Array.isArray(content)) {
               for (const block of content) {
-                if (block?.type === 'text' && typeof block.text === 'string' && block.text) {
+                if (!block || !block.type) continue
+                // Thinking/reasoning: stream so client can show reasoning (if CLI ever sends these in print mode)
+                const isReasoningBlock = block.type === 'reasoning' || block.type === 'thinking'
+                if (isReasoningBlock) {
+                  const thinkingText =
+                    typeof block.reasoning === 'string'
+                      ? block.reasoning
+                      : typeof block.thinking === 'string'
+                        ? block.thinking
+                        : typeof block.text === 'string'
+                          ? block.text
+                          : ''
+                  if (thinkingText) yield { type: 'thinking', text: thinkingText }
+                  continue
+                }
+                if (block.type === 'text' && typeof block.text === 'string' && block.text) {
                   if (toolCtx) {
                     for await (const c of processContentWithActions(
                       block.text,

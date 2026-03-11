@@ -1,0 +1,36 @@
+# Agent PM API server – systemd unit
+#
+# Install (edit PROJECT_PATH first):
+#   sudo sed "s|REPLACE_WITH_PROJECT_PATH|$(pwd)|g" deploy/agent-pm.service > /tmp/agent-pm.service
+#   sudo cp /tmp/agent-pm.service /etc/systemd/system/agent-pm.service
+#   sudo systemctl daemon-reload
+#
+# Run:
+#   sudo systemctl start agent-pm   # or: sudo service agent-pm start
+#   sudo systemctl stop agent-pm
+#   sudo systemctl restart agent-pm
+#   sudo systemctl status agent-pm
+#
+# Run on boot:
+#   sudo systemctl enable agent-pm
+#
+# Logs:
+#   journalctl -u agent-pm -f
+
+[Unit]
+Description=Agent PM API server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=REPLACE_WITH_PROJECT_PATH
+ExecStart=REPLACE_WITH_PROJECT_PATH/node_modules/.bin/tsx server/index.ts
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+# Server listens on 38472 by default (see server/config.ts)
+Environment=PORT=38472
+
+[Install]
+WantedBy=multi-user.target

@@ -14,7 +14,7 @@ import { buildAgentPrompt } from './prompt-builder.js'
 import { createDeepAgent } from 'deepagents'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { createModel } from './langchain-model.js'
-import { LANGCHAIN_TOOLS, createWorkItemTools } from './langchain-tools.js'
+import { LANGCHAIN_TOOLS, createWorkItemTools, writeFileTool } from './langchain-tools.js'
 import type { WorkItemToolContext } from './langchain-tools.js'
 import { createMcpLangChainTools } from './mcp-langchain.js'
 import type { McpToolRow } from '../services/types.js'
@@ -107,7 +107,11 @@ export async function* runAgentStream(
     (options?.mcpToolConfigs?.length ?? 0) > 0
       ? await createMcpLangChainTools(options.mcpToolConfigs ?? [])
       : []
-  const tools: StructuredToolInterface[] = [...workItemTools, ...mcpTools]
+  const tools: StructuredToolInterface[] = [
+    ...workItemTools,
+    ...(options?.toolContext ? [writeFileTool] : []),
+    ...mcpTools,
+  ]
 
   const systemPrompt =
     messages.find((m) => m.role === 'system')?.content ?? 'You are a helpful assistant.'
@@ -302,7 +306,11 @@ export async function runAgent(
     (options?.mcpToolConfigs?.length ?? 0) > 0
       ? await createMcpLangChainTools(options.mcpToolConfigs ?? [])
       : []
-  const tools: StructuredToolInterface[] = [...workItemTools, ...mcpTools]
+  const tools: StructuredToolInterface[] = [
+    ...workItemTools,
+    ...(options?.toolContext ? [writeFileTool] : []),
+    ...mcpTools,
+  ]
 
   const systemPrompt =
     messages.find((m) => m.role === 'system')?.content ?? 'You are a helpful assistant.'

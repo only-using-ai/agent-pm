@@ -7,6 +7,8 @@
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
+import { writeFile } from 'fs/promises'
+import path from 'path'
 
 const WORK_ITEM_STATUS_VALUES = [
   'todo',
@@ -58,6 +60,22 @@ const requestInfoSchema = z.object({
   message: z.string().describe('The question or information you need from the user. Be clear and specific.'),
   work_item_id: z.string().describe('The ID of the work item this request is related to.'),
   agent_name: z.string().describe('Display name of the agent asking for information (e.g. your own name).'),
+})
+
+const writeFileSchema = z.object({
+  filename: z.string().describe('Path or name of the file to write (relative to current working directory or absolute).'),
+  contents: z.string().describe('The full contents to write to the file.'),
+})
+
+const linkAssetToWorkItemSchema = z.object({
+  asset_id: z.string().describe('ID of the asset to link to the current work item.'),
+})
+
+const createAssetAndLinkSchema = z.object({
+  name: z.string().describe('Display name of the asset (e.g. filename or title).'),
+  type: z.enum(['file', 'link', 'folder']).describe('Type of asset: file, link, or folder.'),
+  path: z.string().optional().describe('Optional file path (e.g. path to the file just created).'),
+  url: z.string().optional().describe('Optional URL for link-type assets.'),
 })
 
 /** Context passed when creating work-item tools for a real run (pool, broadcaster, etc.). */
@@ -126,6 +144,17 @@ export interface WorkItemToolContext {
     pool: import('pg').Pool,
     input: { work_item_id: string; project_id?: string; agent_id: string | null; agent_name: string; body: string }
   ) => Promise<{ id: string }>
+  linkAssetToWorkItem?: (
+    pool: import('pg').Pool,
+    projectId: string,
+    workItemId: string,
+    assetId: string
+  ) => Promise<{ linked: boolean }>
+  createAsset?: (
+    pool: import('pg').Pool,
+    projectId: string,
+    input: { name: string; type: 'file' | 'link' | 'folder'; parent_id?: string | null; path?: string | null; url?: string | null; work_item_ids?: string[] }
+  ) => Promise<{ id: string; name: string; type: string; path: string | null; url: string | null }>
 }
 
 /**
@@ -203,6 +232,53 @@ export const requestInfoTool = tool(
   }
 )
 
+export const linkAssetToWorkItemTool = tool(
+  async (_: z.infer<typeof linkAssetToWorkItemSchema>) => {
+    return 'Asset will be linked to the work item by the system.'
+  },
+  {
+    name: 'link_asset_to_work_item',
+    description:
+      'Link an existing asset to the current work item. Use this after creating or identifying an asset so it appears on the work item. Provide the asset id.',
+    schema: linkAssetToWorkItemSchema,
+  }
+)
+
+export const createAssetAndLinkToWorkItemTool = tool(
+  async (_: z.infer<typeof createAssetAndLinkSchema>) => {
+    return 'Asset will be created and linked to the work item by the system.'
+  },
+  {
+    name: 'create_asset_and_link_to_work_item',
+    description:
+      'Create a new asset (e.g. for a file you just created with write_file) and link it to the current work item. Use name and type; optionally path for files or url for links. Use this when you create a new file so it is tracked as an asset on the work item.',
+    schema: createAssetAndLinkSchema,
+  }
+)
+
+/** Write content to a file. Path is relative to process cwd or absolute. */
+export const writeFileTool = tool(
+  async (input: z.infer<typeof writeFileSchema>) => {
+    const filename = typeof input?.filename === 'string' ? input.filename.trim() : ''
+    const contents = typeof input?.contents === 'string' ? input.contents : ''
+    if (!filename) return 'Filename is required.'
+    try {
+      const resolved = path.isAbsolute(filename) ? filename : path.resolve(process.cwd(), filename)
+      await writeFile(resolved, contents, 'utf8')
+      return `Wrote ${contents.length} character(s) to ${resolved}.`
+    } catch (e) {
+      console.error('[write_file]', e)
+      return e instanceof Error ? e.message : 'Failed to write file.'
+    }
+  },
+  {
+    name: 'write_file',
+    description:
+      'Write text contents to a file. Use this to create or overwrite a file. Provide the filename (path) and the full contents. Path can be relative to the current working directory or absolute.',
+    schema: writeFileSchema,
+  }
+)
+
 /** Stub tools array for tests / default use. */
 export const LANGCHAIN_TOOLS: StructuredToolInterface[] = [
   updateWorkItemStatusTool,
@@ -211,6 +287,9 @@ export const LANGCHAIN_TOOLS: StructuredToolInterface[] = [
   createWorkItemAndAssignTool,
   requestForApprovalTool,
   requestInfoTool,
+  writeFileTool,
+  linkAssetToWorkItemTool,
+  createAssetAndLinkToWorkItemTool,
 ]
 
 /**
@@ -405,7 +484,75 @@ export function createWorkItemTools(ctx: WorkItemToolContext): StructuredToolInt
     }
   )
 
-  return [updateStatus, addComment, listAgentsTool, createWorkItemAndAssign, requestForApproval, requestInfo]
+  const linkAssetToWorkItem = tool(
+    async (input: z.infer<typeof linkAssetToWorkItemSchema>) => {
+      const assetId = typeof input?.asset_id === 'string' ? input.asset_id.trim() : ''
+      if (!assetId) return 'asset_id is required.'
+      if (!ctx.workItemId || !ctx.projectId) return 'Work item context missing.'
+      if (!ctx.linkAssetToWorkItem) return 'Linking assets is not available in this context.'
+      try {
+        const { linked } = await ctx.linkAssetToWorkItem(ctx.pool, ctx.projectId, ctx.workItemId, assetId)
+        ctx.broadcaster.broadcastToAgent(ctx.agentId, 'stream_chunk', {
+          chunk: linked ? 'Asset linked to work item.' : 'Asset was already linked to this work item.',
+          type: 'content',
+        })
+        return linked ? 'Asset linked to work item.' : 'Asset was already linked to this work item.'
+      } catch (e) {
+        console.error('[link_asset_to_work_item]', e)
+        return e instanceof Error ? e.message : 'Failed to link asset to work item.'
+      }
+    },
+    {
+      name: 'link_asset_to_work_item',
+      description:
+        'Link an existing asset to the current work item. Use this after creating or identifying an asset so it appears on the work item. Provide the asset id.',
+      schema: linkAssetToWorkItemSchema,
+    }
+  )
+
+  const createAssetAndLinkToWorkItem = tool(
+    async (input: z.infer<typeof createAssetAndLinkSchema>) => {
+      const name = typeof input?.name === 'string' ? input.name.trim() : ''
+      if (!name) return 'name is required.'
+      if (!ctx.workItemId || !ctx.projectId) return 'Work item context missing.'
+      if (!ctx.createAsset) return 'Creating assets is not available in this context.'
+      const type = input?.type === 'file' || input?.type === 'link' || input?.type === 'folder' ? input.type : 'file'
+      try {
+        const row = await ctx.createAsset(ctx.pool, ctx.projectId, {
+          name,
+          type,
+          path: input?.path?.trim() ?? null,
+          url: input?.url?.trim() ?? null,
+          work_item_ids: [ctx.workItemId],
+        })
+        ctx.broadcaster.broadcastToAgent(ctx.agentId, 'stream_chunk', {
+          chunk: `Asset "${row.name}" created and linked to work item (id: ${row.id}).`,
+          type: 'content',
+        })
+        return `Asset "${row.name}" created and linked to work item (id: ${row.id}). Use this when you create a new file so it is tracked on the work item.`
+      } catch (e) {
+        console.error('[create_asset_and_link_to_work_item]', e)
+        return e instanceof Error ? e.message : 'Failed to create asset.'
+      }
+    },
+    {
+      name: 'create_asset_and_link_to_work_item',
+      description:
+        'Create a new asset (e.g. for a file you just created with write_file) and link it to the current work item. Use name and type; optionally path for files or url for links. Use this when you create a new file so it is tracked as an asset on the work item.',
+      schema: createAssetAndLinkSchema,
+    }
+  )
+
+  return [
+    updateStatus,
+    addComment,
+    listAgentsTool,
+    createWorkItemAndAssign,
+    requestForApproval,
+    requestInfo,
+    linkAssetToWorkItem,
+    createAssetAndLinkToWorkItem,
+  ]
 }
 
 export { WORK_ITEM_STATUS_VALUES }

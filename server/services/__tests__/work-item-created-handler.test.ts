@@ -23,6 +23,7 @@ describe('work-item-created-handler (LangChain)', () => {
     priority: 'Medium',
     depends_on: null,
     status: 'todo',
+    require_approval: false,
     archived_at: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -40,7 +41,9 @@ describe('work-item-created-handler (LangChain)', () => {
 
   let mockGetPool: () => { query: ReturnType<typeof vi.fn> }
   let mockGetAgentById: ReturnType<typeof vi.fn>
+  let mockGetProjectById: ReturnType<typeof vi.fn>
   let mockGetPromptByKey: ReturnType<typeof vi.fn>
+  let mockGetContextContent: ReturnType<typeof vi.fn>
   let mockBuildContext: ReturnType<typeof vi.fn>
   let mockGetInitialMessages: ReturnType<typeof vi.fn>
   let mockUpdateWorkItem: ReturnType<typeof vi.fn>
@@ -53,7 +56,9 @@ describe('work-item-created-handler (LangChain)', () => {
   beforeEach(() => {
     mockGetPool = vi.fn(() => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }))
     mockGetAgentById = vi.fn().mockResolvedValue(mockAgent)
+    mockGetProjectById = vi.fn().mockResolvedValue(null)
     mockGetPromptByKey = vi.fn().mockResolvedValue(null)
+    mockGetContextContent = vi.fn().mockResolvedValue('')
     mockBuildContext = vi.fn().mockReturnValue({ userMessage: 'Do something', context: {}, variables: {} })
     mockGetInitialMessages = vi.fn().mockReturnValue([
       { role: 'system', content: '' },
@@ -72,7 +77,9 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
       buildContextForWorkItemCreated: mockBuildContext,
       getInitialMessages: mockGetInitialMessages,
       runAgentStream,
@@ -86,8 +93,14 @@ describe('work-item-created-handler (LangChain)', () => {
     await handler(mockPayload)
 
     expect(mockGetAgentById).toHaveBeenCalledWith(expect.anything(), 'agent-1')
+    expect(mockGetProjectById).toHaveBeenCalledWith(expect.anything(), 'p-1')
     expect(mockGetPromptByKey).toHaveBeenCalledWith(expect.anything(), 'agent_system_prompt')
-    expect(mockBuildContext).toHaveBeenCalledWith(mockAgent, mockPayload, { template: null })
+    expect(mockGetContextContent).toHaveBeenCalled()
+    expect(mockBuildContext).toHaveBeenCalledWith(mockAgent, mockPayload, {
+      template: null,
+      areaContext: '',
+      projectContext: '',
+    })
     expect(mockBroadcaster.broadcastToAgent).toHaveBeenCalledWith('agent-1', 'stream_start', {
       work_item_id: 'wi-1',
       title: 'New task',
@@ -113,7 +126,9 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
       buildContextForWorkItemCreated: mockBuildContext,
       getInitialMessages: mockGetInitialMessages,
       runAgentStream,
@@ -140,7 +155,9 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
       buildContextForWorkItemCreated: mockBuildContext,
       getInitialMessages: mockGetInitialMessages,
       runAgentStream,
@@ -153,6 +170,30 @@ describe('work-item-created-handler (LangChain)', () => {
     })
     await handler({ ...mockPayload, assigned_to: null })
     expect(mockGetAgentById).not.toHaveBeenCalled()
+    expect(mockBroadcaster.broadcastToAgent).not.toHaveBeenCalled()
+  })
+
+  it('returns early when require_approval is true (item goes to Inbox; agent starts on approve)', async () => {
+    const { runAgentStream } = await import('../../agent/index.js')
+    const handler = createWorkItemCreatedHandler({
+      getPool: mockGetPool,
+      getAgentById: mockGetAgentById,
+      getProjectById: mockGetProjectById,
+      getPromptByKey: mockGetPromptByKey,
+      getContextContent: mockGetContextContent,
+      buildContextForWorkItemCreated: mockBuildContext,
+      getInitialMessages: mockGetInitialMessages,
+      runAgentStream,
+      updateWorkItem: mockUpdateWorkItem,
+      addWorkItemComment: mockAddWorkItemComment,
+      listAgents: mockListAgents,
+      createWorkItem: mockCreateWorkItem,
+      emitWorkItemCreated: mockEmitWorkItemCreated,
+      broadcaster: mockBroadcaster,
+    })
+    await handler({ ...mockPayload, require_approval: true })
+    expect(mockGetAgentById).not.toHaveBeenCalled()
+    expect(mockBuildContext).not.toHaveBeenCalled()
     expect(mockBroadcaster.broadcastToAgent).not.toHaveBeenCalled()
   })
 })

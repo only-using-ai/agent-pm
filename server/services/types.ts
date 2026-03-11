@@ -41,6 +41,7 @@ export type ProjectRow = {
   priority: string | null
   description: string | null
   path: string | null
+  project_context: string | null
   created_at: string
   archived_at: string | null
 }
@@ -50,6 +51,7 @@ export type CreateProjectInput = {
   priority?: string | null
   description?: string | null
   path?: string | null
+  project_context?: string | null
 }
 
 export type UpdateProjectInput = {
@@ -57,6 +59,7 @@ export type UpdateProjectInput = {
   priority?: string | null
   description?: string | null
   path?: string | null
+  project_context?: string | null
 }
 
 export type ProjectColumnRow = {
@@ -75,6 +78,7 @@ export type CreateProjectColumnInput = {
 export type UpdateProjectColumnInput = {
   title?: string
   color?: string
+  position?: number
 }
 
 export type WorkItemRow = {
@@ -101,9 +105,13 @@ export type WorkItemCommentRow = {
   author_id: string | null
   body: string
   created_at: string
+  mentioned_agent_ids?: string[]
 }
 
-export type WorkItemWithCommentsRow = WorkItemRow & { comments: WorkItemCommentRow[] }
+export type WorkItemWithCommentsRow = WorkItemRow & {
+  comments: WorkItemCommentRow[]
+  asset_ids?: string[]
+}
 
 export type CreateWorkItemInput = {
   title: string
@@ -113,6 +121,7 @@ export type CreateWorkItemInput = {
   depends_on?: string | null
   status?: string
   require_approval?: boolean
+  asset_ids?: string[]
 }
 
 export type UpdateWorkItemInput = Partial<{
@@ -123,6 +132,37 @@ export type UpdateWorkItemInput = Partial<{
   depends_on: string | null
   status: string
   require_approval: boolean
+  asset_ids: string[]
+}>
+
+export type AssetRow = {
+  id: string
+  project_id: string
+  parent_id: string | null
+  name: string
+  type: 'file' | 'link' | 'folder'
+  path: string | null
+  url: string | null
+  created_at: string
+}
+
+export type AssetTreeNode = AssetRow & { children: AssetTreeNode[] }
+
+export type CreateAssetInput = {
+  name: string
+  type: 'file' | 'link' | 'folder'
+  parent_id?: string | null
+  path?: string | null
+  url?: string | null
+  work_item_ids?: string[]
+}
+
+export type UpdateAssetInput = Partial<{
+  name: string
+  type: 'file' | 'link' | 'folder'
+  parent_id: string | null
+  path: string | null
+  url: string | null
 }>
 
 export type ListOptions = { includeArchived?: boolean }

@@ -27,9 +27,19 @@ export type WorkItemCommentPayload = {
     author_id: string | null
     body: string
     created_at: string
+    mentioned_agent_ids?: string[]
   }
   work_item_id: string
   project_id: string
+}
+
+/** Emitted when a comment is saved with at least one @-mentioned agent. Queued agents process the work item and comments. */
+export type WorkItemCommentedPayload = {
+  comment: WorkItemCommentPayload['comment']
+  work_item_id: string
+  project_id: string
+  /** Agent IDs that were @-mentioned in the comment. */
+  mentioned_agent_ids: string[]
 }
 
 /** Payload when a work item's assigned_to changes. Same shape as updated work item row. */
@@ -60,6 +70,7 @@ export type WorkItemApprovedPayload = {
 export type HookEvent =
   | 'work_item.created'
   | 'work_item.comment'
+  | 'work_item.commented'
   | 'work_item.assignment_change'
   | 'work_item.approved'
 
@@ -86,11 +97,13 @@ export function on<K extends HookEvent>(
     ? HookHandler<WorkItemCreatedPayload>
     : K extends 'work_item.comment'
       ? HookHandler<WorkItemCommentPayload>
-      : K extends 'work_item.assignment_change'
-        ? HookHandler<WorkItemAssignmentChangePayload>
-        : K extends 'work_item.approved'
-          ? HookHandler<WorkItemApprovedPayload>
-          : never
+      : K extends 'work_item.commented'
+        ? HookHandler<WorkItemCommentedPayload>
+        : K extends 'work_item.assignment_change'
+          ? HookHandler<WorkItemAssignmentChangePayload>
+          : K extends 'work_item.approved'
+            ? HookHandler<WorkItemApprovedPayload>
+            : never
 ): () => void {
   const set = getListeners(event)
   set.add(handler as HookHandler<unknown>)

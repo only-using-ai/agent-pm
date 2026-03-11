@@ -16,14 +16,35 @@ import { Search, User, LogOut, Moon, Sun } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/theme-context'
 import { CommandPalette } from '@/components/command-palette'
+import { getProfile, getProfileAvatarUrl, type Profile } from '@/lib/api'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
-// Stub – replace with real user/session
-const USER_NAME = 'Alex Johnson'
+function displayName(profile: Profile | null): string {
+  if (!profile) return 'Profile'
+  const first = profile.first_name?.trim() ?? ''
+  const last = profile.last_name?.trim() ?? ''
+  return [first, last].filter(Boolean).join(' ') || 'Profile'
+}
+
+function getInitials(profile: Profile | null): string {
+  if (!profile) return '?'
+  const a = profile.first_name?.trim()[0] ?? ''
+  const b = profile.last_name?.trim()[0] ?? ''
+  return (a + b).toUpperCase().slice(0, 2) || '?'
+}
 
 export function TopNav() {
   const { isDark, setTheme } = useTheme()
   const navigate = useNavigate()
   const [commandOpen, setCommandOpen] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  useEffect(() => {
+    const load = () => getProfile().then(setProfile).catch(() => {})
+    load()
+    const onUpdate = (e: Event) => setProfile((e as CustomEvent<Profile>).detail)
+    window.addEventListener('profile-updated', onUpdate)
+    return () => window.removeEventListener('profile-updated', onUpdate)
+  }, [])
 
   const openCommand = useCallback(() => setCommandOpen(true), [])
 
@@ -62,23 +83,30 @@ export function TopNav() {
         <DropdownMenu>
         <DropdownMenuTrigger
           className={cn(
-            'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent',
+            'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent overflow-hidden',
             'bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground',
             'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none'
           )}
         >
-          <User className="size-4" />
+          {profile?.avatar_url ? (
+            <Avatar size="sm" className="size-9">
+              <AvatarImage src={`${getProfileAvatarUrl()}?t=nav`} alt={displayName(profile)} />
+              <AvatarFallback className="text-xs">{getInitials(profile)}</AvatarFallback>
+            </Avatar>
+          ) : (
+            <User className="size-4" />
+          )}
           <span className="sr-only">Open user menu</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuGroup>
             <DropdownMenuLabel className="font-normal">
-              <p className="text-sm font-medium leading-none">{USER_NAME}</p>
+              <p className="text-sm font-medium leading-none">{displayName(profile)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Signed in</p>
             </DropdownMenuLabel>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => navigate('/profile')}>
+          <DropdownMenuItem onClick={() => navigate('/profile')}>
             <User className="mr-2 size-4" />
             Profile
           </DropdownMenuItem>

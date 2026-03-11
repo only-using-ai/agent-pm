@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Camera } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -14,37 +14,110 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import {
+  getProfile,
+  updateProfile,
+  uploadProfileAvatar,
+  getProfileAvatarUrl,
+  type Profile,
+} from '@/lib/api'
 
-// Stub – replace with real user/session
-const INITIAL_NAME = 'Alex Johnson'
-const INITIAL_EMAIL = 'alex.johnson@example.com'
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+function getInitials(firstName: string, lastName: string) {
+  const a = firstName.trim()[0] ?? ''
+  const b = lastName.trim()[0] ?? ''
+  return (a + b).toUpperCase().slice(0, 2) || '?'
 }
 
 export function ProfilePage() {
-  const [name, setName] = useState(INITIAL_NAME)
-  const [email, setEmail] = useState(INITIAL_EMAIL)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [avatarKey, setAvatarKey] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handlePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file?.type.startsWith('image/')) return
-    const url = URL.createObjectURL(file)
-    setAvatarUrl(url)
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    getProfile()
+      .then((p) => {
+        if (cancelled) return
+        setProfile(p)
+        setFirstName(p.first_name)
+        setLastName(p.last_name)
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load profile')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    setSaved(false)
+    try {
+      const updated = await updateProfile({ first_name: firstName, last_name: lastName })
+      setProfile(updated)
+      setSaved(true)
+      window.dispatchEvent(new CustomEvent('profile-updated', { detail: updated }))
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save profile')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // TODO: persist profile
-    console.log({ name, email, avatarUrl: avatarUrl ?? 'default' })
+  const handlePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file?.type.startsWith('image/')) return
+    setUploading(true)
+    setError(null)
+    try {
+      const updated = await uploadProfileAvatar(file)
+      setProfile(updated)
+      setAvatarKey((k) => k + 1)
+      window.dispatchEvent(new CustomEvent('profile-updated', { detail: updated }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to upload image')
+    } finally {
+      setUploading(false)
+    }
+    e.target.value = ''
+  }
+
+  const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || 'Profile'
+  const avatarUrl = profile?.avatar_url
+    ? `${getProfileAvatarUrl()}?t=${avatarKey}`
+    : null
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="flex items-center gap-2">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+            Back
+          </Link>
+        </div>
+        <p className="text-sm text-muted-foreground">Loading profile…</p>
+      </div>
+    )
   }
 
   return (
@@ -63,7 +136,7 @@ export function ProfilePage() {
           <CardHeader>
             <CardTitle>Profile</CardTitle>
             <CardDescription>
-              Update your profile picture, name, and email.
+              Update your profile picture, first name, and last name.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -73,14 +146,15 @@ export function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="relative rounded-full ring-2 ring-border ring-offset-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={uploading}
+                  className="relative rounded-full ring-2 ring-border ring-offset-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
                 >
                   <Avatar size="lg" className="size-20">
                     {avatarUrl ? (
-                      <AvatarImage src={avatarUrl} alt={name} />
+                      <AvatarImage src={avatarUrl} alt={displayName} />
                     ) : null}
                     <AvatarFallback className="text-lg">
-                      {getInitials(name)}
+                      {getInitials(firstName, lastName)}
                     </AvatarFallback>
                   </Avatar>
                   <span
@@ -90,11 +164,11 @@ export function ProfilePage() {
                     )}
                   >
                     <Camera className="size-5" />
-                    Change
+                    {uploading ? 'Uploading…' : 'Change'}
                   </span>
                 </button>
                 <div className="text-sm text-muted-foreground">
-                  Click the avatar to upload a new picture. JPG, PNG or GIF.
+                  Click the avatar to upload a new picture. JPG, PNG, GIF or WebP.
                 </div>
                 <input
                   ref={fileInputRef}
@@ -107,32 +181,40 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="profile-name">Name</Label>
-              <Input
-                id="profile-name"
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="profile-first-name">First name</Label>
+                <Input
+                  id="profile-first-name"
+                  type="text"
+                  placeholder="First name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-last-name">Last name</Label>
+                <Input
+                  id="profile-last-name"
+                  type="text"
+                  placeholder="Last name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="profile-email">Email</Label>
-              <Input
-                id="profile-email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
           </CardContent>
           <CardFooter className="gap-2">
-            <Button type="submit">Save changes</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+            {saved && (
+              <span className="text-sm text-muted-foreground">Saved.</span>
+            )}
             <Link to="/" className={buttonVariants({ variant: 'outline' })}>
               Cancel
             </Link>

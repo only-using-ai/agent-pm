@@ -22,6 +22,7 @@ import {
   ChevronDown,
   FileText,
   FolderKanban,
+  FolderTree,
   Inbox,
   LayoutDashboard,
   ListTodo,
@@ -73,6 +74,26 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
+              {/* Inbox – direct link */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Inbox"
+                  render={<Link to="/inbox" />}
+                  isActive={location.pathname === '/inbox'}
+                >
+                  <Inbox className="size-4" />
+                  <span>Inbox</span>
+                  {inboxCount > 0 && (
+                    <SidebarMenuBadge
+                      className="rounded-full bg-primary text-[10px] text-primary-foreground"
+                      aria-label={`${inboxCount} items in inbox`}
+                    >
+                      {inboxCount > 99 ? '99+' : inboxCount}
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               {/* Work Items – direct link */}
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -97,23 +118,15 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* Inbox – direct link */}
+              {/* Assets – direct link */}
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  tooltip="Inbox"
-                  render={<Link to="/inbox" />}
-                  isActive={location.pathname === '/inbox'}
+                  tooltip="Assets"
+                  render={<Link to="/assets" />}
+                  isActive={location.pathname === '/assets'}
                 >
-                  <Inbox className="size-4" />
-                  <span>Inbox</span>
-                  {inboxCount > 0 && (
-                    <SidebarMenuBadge
-                      className="rounded-full bg-primary text-[10px] text-primary-foreground"
-                      aria-label={`${inboxCount} items in inbox`}
-                    >
-                      {inboxCount > 99 ? '99+' : inboxCount}
-                    </SidebarMenuBadge>
-                  )}
+                  <FolderTree className="size-4" />
+                  <span>Assets</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -161,7 +174,7 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <CollapsibleTrigger className={cn(menuButtonClass)}>
                     <FolderKanban className="size-4" />
-                    <span>Project</span>
+                    <span>Projects</span>
                     <ChevronDown className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
                   </CollapsibleTrigger>
                   <CollapsibleContent>

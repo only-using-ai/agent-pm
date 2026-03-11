@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useMcp } from '@/contexts/mcp-context'
 import { ArrowLeft } from 'lucide-react'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,

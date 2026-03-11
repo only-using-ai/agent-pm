@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useMcp } from '@/contexts/mcp-context'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,

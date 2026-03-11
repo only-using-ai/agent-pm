@@ -135,6 +135,10 @@ export async function updateColumn(
     updates.push(`color = $${paramIndex++}`)
     values.push(colorVal)
   }
+  if (input.position !== undefined && Number.isInteger(input.position) && input.position >= 0) {
+    updates.push(`position = $${paramIndex++}`)
+    values.push(input.position)
+  }
   if (updates.length === 0) {
     const { rows } = await pool.query(
       `SELECT project_id, id, title, color, position FROM project_columns
