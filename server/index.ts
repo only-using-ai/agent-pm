@@ -40,9 +40,11 @@ import { createWorkItemCreatedHandler } from './services/work-item-created-handl
 import { createWorkItemAssignmentChangeHandler } from './services/work-item-assignment-change-handler.js'
 import { createWorkItemApprovedHandler } from './services/work-item-approved-handler.js'
 import { createWorkItemCommentedHandler } from './services/work-item-commented-handler.js'
+import { createWorkItemCancelHandler } from './services/work-item-cancel-handler.js'
 import type { AgentStreamChunk } from './services/work-item-created-handler.js'
 import { getServerPort, getDatabaseUrl } from './config.js'
 import { errorMiddleware } from './errors.js'
+import { setCancelRequested, isCancelRequested, clearCancelRequested } from './cancel-work-item.js'
 import { mountRoutes } from './routes/index.js'
 
 const app = express()
@@ -82,6 +84,8 @@ const commonHandlerDeps = {
   getInitialMessages: (agent: unknown, context: unknown) =>
     buildAgentPrompt(agent as Parameters<typeof buildAgentPrompt>[0], context as AgentContext),
   runAgentStream,
+  isCancelRequested,
+  clearCancelRequested,
   updateWorkItem: (p, projectId, workItemId, input) =>
     updateWorkItemService(p, projectId, workItemId, input as Parameters<typeof updateWorkItemService>[3]),
   addWorkItemComment: (p, projectId, workItemId, body, options) =>
@@ -142,6 +146,16 @@ on(
   })
 )
 
+on(
+  'work_item.cancel',
+  createWorkItemCancelHandler({
+    getPool: pool,
+    updateWorkItem: (p, projectId, workItemId, input) =>
+      updateWorkItemService(p, projectId, workItemId, input as Parameters<typeof updateWorkItemService>[3]),
+    broadcaster: sse,
+  })
+)
+
 app.use(cors())
 app.use(express.json())
 
@@ -149,7 +163,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
 })
 
-mountRoutes(app, { getPool: pool, sse, emit, upload })
+mountRoutes(app, { getPool: pool, sse, emit, setCancelRequested, upload })
 
 app.use(errorMiddleware)
 

@@ -62,8 +62,8 @@ export function substitutePromptVariables(
   })
 }
 
-/** Cursor CLI: one line per action, format __AGENT_ACTION__ <tool> <json>. */
-const CURSOR_ACTIONS_INSTRUCTIONS = `Because you are running in Cursor CLI mode, you do not have direct tool calls. Output exactly one line per action with no other text on that line. The system will execute these and replace them with a short confirmation.
+/** Cursor / Gemini CLI: one line per action, format __AGENT_ACTION__ <tool> <json>. */
+const CLI_ACTIONS_INSTRUCTIONS = `Because you are running in Cursor CLI mode, you do not have direct tool calls. Output exactly one line per action with no other text on that line. The system will execute these and replace them with a short confirmation.
 
 Actions (use the exact tool name and JSON):
 - __AGENT_ACTION__ update_work_item_status {"status":"in_progress"}  (status: one of todo, in_progress, completed, blocked, canceled)
@@ -86,8 +86,8 @@ export function getWorkItemCreatedPromptVariables(
   payload: WorkItemCreatedPayload,
   options?: { areaContext?: string; projectContext?: string }
 ): Record<string, string> {
-  const isCursor = (agent.ai_provider ?? '').toLowerCase() === 'cursor'
-  const cursorBlock = isCursor ? CURSOR_ACTIONS_INSTRUCTIONS : ''
+  const isCliAgent = ['cursor', 'gemini'].includes((agent.ai_provider ?? '').toLowerCase())
+  const cursorBlock = isCliAgent ? CLI_ACTIONS_INSTRUCTIONS : ''
   return {
     WORK_ITEM_ID: payload.id,
     WORK_ITEM_TITLE: payload.title?.trim() || 'Untitled',
@@ -138,8 +138,8 @@ export function getWorkItemCommentedPromptVariables(
   options?: { areaContext?: string; projectContext?: string; agentNames?: Map<string, string> }
 ): Record<string, string> {
   const commentsText = formatWorkItemComments(workItem.comments ?? [], options?.agentNames)
-  const isCursor = (agent.ai_provider ?? '').toLowerCase() === 'cursor'
-  const cursorBlock = isCursor ? CURSOR_ACTIONS_INSTRUCTIONS : ''
+  const isCliAgent = ['cursor', 'gemini'].includes((agent.ai_provider ?? '').toLowerCase())
+  const cursorBlock = isCliAgent ? CLI_ACTIONS_INSTRUCTIONS : ''
   return {
     WORK_ITEM_ID: workItem.id,
     WORK_ITEM_TITLE: workItem.title?.trim() || 'Untitled',
@@ -208,7 +208,7 @@ function buildWorkItemCreatedUserMessage(
 ): string {
   const title = payload.title?.trim() || 'Untitled'
   const hasDescription = payload.description?.trim()
-  const isCursor = (agent.ai_provider ?? '').toLowerCase() === 'cursor'
+  const isCliAgent = ['cursor', 'gemini'].includes((agent.ai_provider ?? '').toLowerCase())
   const parts: string[] = [
     `You are an AI agent. Your role is: ${agent.instructions}`,
     `A new work item was created and assigned to you: "${title}".`,
@@ -227,8 +227,8 @@ function buildWorkItemCreatedUserMessage(
     'Be concise and brief to the user unless otherwise instructed.',
     'If the user asks to create new work items, issues, or stories, use the tool create_work_item_and_assign to create the new work item and assign it to the user. Use the list_available_agents tool to get the list of available agents to assign the new work item to.',
   ]
-  if (isCursor) {
-    parts.push(CURSOR_ACTIONS_INSTRUCTIONS)
+  if (isCliAgent) {
+    parts.push(CLI_ACTIONS_INSTRUCTIONS)
   }
   return parts.filter(Boolean).join(' ')
 }
@@ -278,7 +278,7 @@ function buildWorkItemAssignmentChangeUserMessage(
 ): string {
   const title = payload.title?.trim() || 'Untitled'
   const hasDescription = payload.description?.trim()
-  const isCursor = (agent.ai_provider ?? '').toLowerCase() === 'cursor'
+  const isCliAgent = ['cursor', 'gemini'].includes((agent.ai_provider ?? '').toLowerCase())
   const parts: string[] = [
     `You are an AI agent. Your role is: ${agent.instructions}`,
     `This work item was reassigned to you: "${title}".`,
@@ -297,8 +297,8 @@ function buildWorkItemAssignmentChangeUserMessage(
     'Be concise and brief to the user unless otherwise instructed.',
     'If the user asks to create new work items, issues, or stories, use the tool create_work_item_and_assign to create the new work item and assign it to the user. Use the list_available_agents tool to get the list of available agents to assign the new work item to.',
   ]
-  if (isCursor) {
-    parts.push(CURSOR_ACTIONS_INSTRUCTIONS)
+  if (isCliAgent) {
+    parts.push(CLI_ACTIONS_INSTRUCTIONS)
   }
   return parts.filter(Boolean).join(' ')
 }

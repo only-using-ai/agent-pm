@@ -4,6 +4,7 @@ import { getApiBase } from '@/lib/api'
 const MODEL_ENDPOINTS: Record<string, string> = {
   ollama: '/api/ollama/models',
   cursor: '/api/cursor/models',
+  gemini: '/api/gemini/models',
   anthropic: '/api/anthropic/models',
 }
 

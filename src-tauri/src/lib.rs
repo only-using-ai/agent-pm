@@ -148,6 +148,12 @@ pub fn run() {
           .item(&cut_item)
           .item(&paste_item)
           .build()?;
+      let select_all_item =
+        MenuItemBuilder::with_id("select-all", "Select All").accelerator("CmdOrControl+A").build(app.handle())?;
+      let selection_submenu =
+        SubmenuBuilder::new(app.handle(), "Selection")
+          .item(&select_all_item)
+          .build()?;
       let refresh =
         MenuItemBuilder::with_id("refresh-app", "Refresh App").build(app.handle())?;
       let window_submenu =
@@ -155,6 +161,7 @@ pub fn run() {
       let menu = MenuBuilder::new(app.handle())
         .item(&app_submenu)
         .item(&edit_submenu)
+        .item(&selection_submenu)
         .item(&window_submenu)
         .item(&help_submenu)
         .build()?;
@@ -193,6 +200,10 @@ pub fn run() {
       } else if id == "edit-paste" {
         if let Some(w) = app.get_webview_window("main") {
           let _ = w.eval("document.execCommand('paste')");
+        }
+      } else if id == "select-all" {
+        if let Some(w) = app.get_webview_window("main") {
+          let _ = w.eval("document.execCommand('selectAll')");
         }
       } else if id == "log-to-file" {
         let current = read_log_to_file(app);

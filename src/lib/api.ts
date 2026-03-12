@@ -257,6 +257,10 @@ export type WorkItem = {
   archived_at: string | null
   created_at: string
   updated_at: string
+  /** Set when listing project work items (kanban): name of assigned agent */
+  agent_name?: string | null
+  /** Set when listing project work items (kanban): last completed session duration in seconds */
+  last_completion_duration_seconds?: number | null
 }
 
 export type WorkItemComment = {
@@ -369,6 +373,16 @@ export async function archiveWorkItem(projectId: string, workItemId: string): Pr
     throw new Error((err as { error?: string }).error ?? 'Failed to archive work item')
   }
   return res.json()
+}
+
+export async function cancelWorkItem(projectId: string, workItemId: string): Promise<void> {
+  const res = await fetch(`${getApiBase()}/api/projects/${projectId}/work-items/${workItemId}/cancel`, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to cancel work item')
+  }
 }
 
 export async function addWorkItemComment(

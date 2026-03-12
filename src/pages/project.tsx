@@ -42,6 +42,7 @@ import {
   createWorkItem,
   updateWorkItem,
   archiveWorkItem,
+  cancelWorkItem,
   addWorkItemComment,
   listAssets,
   type WorkItem,
@@ -74,8 +75,39 @@ export interface KanbanItem {
   id: string
   title: string
   status: string
+  /** Agent that worked on the item (from assigned_to) */
+  agent_name?: string | null
+  /** Last completed session duration in seconds */
+  last_completion_duration_seconds?: number | null
+  /** Last updated timestamp (ISO) */
+  updated_at?: string
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`
+  const h = Math.floor(m / 60)
+  const rem = m % 60
+  return rem > 0 ? `${h}h ${rem}m` : `${h}h`
+}
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60_000)
+  const diffHours = Math.floor(diffMs / 3_600_000)
+  const diffDays = Math.floor(diffMs / 86_400_000)
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+}
+
+/** Work item card in kanban columns: title, agent name, completion duration, last updated. */
 function KanbanCard({
   item,
   isDragging,
@@ -87,6 +119,10 @@ function KanbanCard({
   onClick?: () => void
   isAgentActive?: boolean
 }) {
+  const durationText =
+    item.last_completion_duration_seconds != null && item.last_completion_duration_seconds > 0
+      ? formatDuration(item.last_completion_duration_seconds)
+      : null
   return (
     <div
       role="button"
@@ -106,15 +142,28 @@ function KanbanCard({
         isDragging && 'opacity-90 shadow-md ring-2 ring-primary'
       )}
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="truncate flex-1">{item.title}</span>
-        {isAgentActive && (
-          <span
-            className="shrink-0 size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"
-            title="Agent is working on this item"
-            aria-label="Agent is working on this item"
-          />
-        )}
+      <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="truncate flex-1 font-medium">{item.title}</span>
+          {isAgentActive && (
+            <span
+              className="shrink-0 size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"
+              title="Agent is working on this item"
+              aria-label="Agent is working on this item"
+            />
+          )}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+          {item.agent_name != null && item.agent_name !== '' && (
+            <span title="Agent that worked on this item">{item.agent_name}</span>
+          )}
+          {durationText != null && (
+            <span title="Time for agent to complete">Completed in {durationText}</span>
+          )}
+          {item.updated_at != null && item.updated_at !== '' && (
+            <span title="Last updated">Updated {formatRelativeTime(item.updated_at)}</span>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -197,7 +246,7 @@ function DroppableColumn({
   return (
     <div
       className={cn(
-        'flex min-w-[200px] flex-1 flex-col rounded-xl border-2 border-dashed p-3 transition-colors',
+        'flex min-w-[320px] flex-1 flex-col rounded-xl border-2 border-dashed p-3 transition-colors',
         column.color,
         isOver && 'border-primary bg-primary/5',
         isColumnDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
@@ -304,7 +353,14 @@ function DroppableColumn({
 }
 
 function workItemsToKanban(items: WorkItem[]): KanbanItem[] {
-  return items.map((w) => ({ id: w.id, title: w.title, status: w.status }))
+  return items.map((w) => ({
+    id: w.id,
+    title: w.title,
+    status: w.status,
+    agent_name: w.agent_name ?? null,
+    last_completion_duration_seconds: w.last_completion_duration_seconds ?? null,
+    updated_at: w.updated_at,
+  }))
 }
 
 export function ProjectPage() {
@@ -365,6 +421,7 @@ export function ProjectPage() {
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null)
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [archiveSubmitting, setArchiveSubmitting] = useState(false)
+  const [cancelSubmitting, setCancelSubmitting] = useState(false)
   const [projectAssets, setProjectAssets] = useState<Asset[]>([])
   const [linkedAssetIds, setLinkedAssetIds] = useState<string[]>([])
   const [addAssetSelectValue, setAddAssetSelectValue] = useState('')
@@ -421,14 +478,18 @@ export function ProjectPage() {
     if (exists) setEditingWorkItemId(workItemParam)
   }, [projectId, workItemParam, workItems])
 
-  // Sync work item status when an agent updates it via tool (e.g. update_work_item_status)
+  // Sync work item status when an agent updates it via tool or cancel (e.g. update_work_item_status, work_item.cancel)
   useEffect(() => {
     const u = lastWorkItemStatusUpdate
     if (!u || !projectId || u.project_id !== projectId) return
     setWorkItems((prev) =>
       prev.map((w) => (w.id === u.work_item_id ? { ...w, status: u.status } : w))
     )
-  }, [lastWorkItemStatusUpdate, projectId])
+    if (u.work_item_id === editingWorkItemId) {
+      setEditingWorkItem((prev) => (prev ? { ...prev, status: u.status } : null))
+      setEditForm((f) => ({ ...f, status: u.status }))
+    }
+  }, [lastWorkItemStatusUpdate, projectId, editingWorkItemId])
 
   const moveItem = useCallback(
     async (itemId: string, newStatus: string) => {
@@ -776,6 +837,16 @@ export function ProjectPage() {
     }
   }, [projectId, editingWorkItemId, closeEditModal])
 
+  const handleCancelWorkItem = useCallback(async () => {
+    if (!projectId || !editingWorkItemId) return
+    setCancelSubmitting(true)
+    try {
+      await cancelWorkItem(projectId, editingWorkItemId)
+    } finally {
+      setCancelSubmitting(false)
+    }
+  }, [projectId, editingWorkItemId])
+
   const reorderColumns = useCallback(
     async (fromIndex: number, toIndex: number) => {
       if (!projectId || fromIndex === toIndex) return
@@ -919,7 +990,7 @@ export function ProjectPage() {
               />
             ))}
             {addingColumn ? (
-              <div className="flex min-w-[200px] flex-col rounded-xl border-2 border-dashed border-border bg-muted/20 p-3">
+              <div className="flex min-w-[320px] flex-col rounded-xl border-2 border-dashed border-border bg-muted/20 p-3">
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   New column
                 </h3>
@@ -959,7 +1030,7 @@ export function ProjectPage() {
                 type="button"
                 onClick={() => setAddingColumn(true)}
                 className={cn(
-                  'flex min-w-[200px] flex-1 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/25 p-4',
+                  'flex min-w-[320px] flex-1 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/25 p-4',
                   'text-sm text-muted-foreground transition-colors hover:border-muted-foreground/50 hover:bg-muted/30 hover:text-foreground'
                 )}
               >
@@ -1222,13 +1293,23 @@ export function ProjectPage() {
             <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Edit issue
             </div>
-            {editingWorkItemId && activeWorkItemIds.has(editingWorkItemId) && (
-              <div className="mb-3 flex items-center gap-2">
+            {editingWorkItemId && activeWorkItemIds.has(editingWorkItemId) && editingWorkItem && (
+              <div className="mb-3 flex items-center justify-between gap-2">
                 <span
                   className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"
                   title="An agent is currently working on this item"
                   aria-label="An agent is currently working on this item"
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                  disabled={cancelSubmitting}
+                  onClick={handleCancelWorkItem}
+                >
+                  {cancelSubmitting ? 'Cancelling…' : 'Cancel work'}
+                </Button>
               </div>
             )}
             <DialogTitle className="sr-only">Edit Work Item</DialogTitle>

@@ -24,7 +24,6 @@ import {
   FolderTree,
   Inbox,
   LayoutDashboard,
-  ListTodo,
   Plug,
   Settings,
 } from 'lucide-react'
@@ -32,6 +31,7 @@ import { cn } from '@/lib/utils'
 import { useAgents } from '@/contexts/agents-context'
 import { useAgentStream } from '@/contexts/agent-stream-context'
 import { useMcp } from '@/contexts/mcp-context'
+import { INTERNAL_TOOLS } from '@/lib/internal-tools'
 import { useProjects } from '@/contexts/projects-context'
 import { useInbox } from '@/contexts/inbox-context'
 
@@ -90,18 +90,6 @@ export function AppSidebar() {
                       {inboxCount > 99 ? '99+' : inboxCount}
                     </SidebarMenuBadge>
                   )}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              {/* Work Items – direct link */}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip="Work Items"
-                  render={<Link to="/work-items" />}
-                  isActive={location.pathname === '/work-items'}
-                >
-                  <ListTodo className="size-4" />
-                  <span>Work Items</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -177,7 +165,7 @@ export function AppSidebar() {
                                 <span className="flex items-center gap-2 min-w-0">
                                   {project.color && (
                                     <span
-                                      className="size-2.5 shrink-0 rounded-sm"
+                                      className="size-2.5 shrink-0 rounded-[4px]"
                                       style={{ backgroundColor: project.color }}
                                       aria-hidden
                                     />
@@ -228,13 +216,50 @@ export function AppSidebar() {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
+                      {/* Internal Tools sub-folder */}
+                      <SidebarMenuSubItem>
+                        <Collapsible defaultOpen={false} className="group/internal">
+                          <CollapsibleTrigger
+                            className={cn(
+                              menuButtonClass,
+                              'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm'
+                            )}
+                          >
+                            <span className="truncate">Internal Tools</span>
+                            <ChevronDown className="ml-auto size-4 shrink-0 transition-transform group-data-[state=open]/internal:rotate-180" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub className="ml-2 border-l border-sidebar-border pl-2">
+                              {INTERNAL_TOOLS.map((tool) => (
+                                <SidebarMenuSubItem key={tool.id}>
+                                  <SidebarMenuSubButton
+                                    render={
+                                      <Link to={`/mcp/internal/${tool.id}`} />
+                                    }
+                                    isActive={
+                                      location.pathname ===
+                                      `/mcp/internal/${tool.id}`
+                                    }
+                                  >
+                                    <span className="min-w-0 truncate" title={tool.name}>
+                                      {tool.name}
+                                    </span>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </SidebarMenuSubItem>
                       {!mcpLoading &&
                         mcpTools.map((tool) => (
                           <SidebarMenuSubItem key={tool.id}>
                             <SidebarMenuSubButton
                               render={<Link to={`/mcp/${tool.id}`} />}
                             >
-                              {tool.name}
+                              <span className="min-w-0 truncate" title={tool.name}>
+                                {tool.name}
+                              </span>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}

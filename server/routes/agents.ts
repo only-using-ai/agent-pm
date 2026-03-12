@@ -9,6 +9,7 @@ import {
 import { listWorkItemsByAgent } from '../services/work-items.service.js'
 import { fetchOllamaModels } from '../services/ollama.service.js'
 import { fetchCursorModels } from '../services/cursor.service.js'
+import { fetchGeminiModels } from '../services/gemini.service.js'
 import { fetchAnthropicModels } from '../services/anthropic.service.js'
 import type { RouteDeps } from './types.js'
 import { asyncHandler, badGateway, notFound } from '../errors.js'
@@ -127,8 +128,12 @@ export function createAiModelsRouter(_deps: Pick<RouteDeps, 'getPool'>): Router 
     '/ollama/models',
     asyncHandler(async (_req, res) => {
       const result = await fetchOllamaModels(OLLAMA_BASE)
-      if (result.ok) return res.json({ models: result.models })
-      throw badGateway(result.error ?? 'Ollama request failed', result.detail)
+      if (result.ok) {
+        return res.json({ models: result.models })
+      }
+      // When Ollama is unreachable or returns an error, surface an empty list
+      // instead of a 502 so the UI can continue without showing an error.
+      return res.json({ models: [] })
     })
   )
 
@@ -138,6 +143,15 @@ export function createAiModelsRouter(_deps: Pick<RouteDeps, 'getPool'>): Router 
       const result = await fetchCursorModels()
       if (result.ok) return res.json({ models: result.models })
       throw badGateway(result.error ?? 'Cursor request failed', result.detail)
+    })
+  )
+
+  router.get(
+    '/gemini/models',
+    asyncHandler(async (_req, res) => {
+      const result = await fetchGeminiModels()
+      if (result.ok) return res.json({ models: result.models })
+      throw badGateway(result.error ?? 'Gemini request failed', result.detail)
     })
   )
 

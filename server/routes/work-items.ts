@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import {
   listAllWorkItems,
-  listWorkItemsByProject,
+  listWorkItemsByProjectWithKanbanMeta,
   getWorkItem,
   createWorkItem,
   updateWorkItem,
@@ -9,7 +9,7 @@ import {
   addWorkItemComment,
 } from '../services/work-items.service.js'
 import { createApprovalRequest } from '../services/approval-requests.service.js'
-import type { WorkItemAssignmentChangePayload } from '../hooks.js'
+import type { WorkItemAssignmentChangePayload, WorkItemCancelPayload } from '../hooks.js'
 import type { RouteDeps } from './types.js'
 import { asyncHandler, notFound } from '../errors.js'
 import { validateBody, validateParams, validateQuery } from './validate.js'
@@ -43,7 +43,7 @@ export function createWorkItemsRouter(deps: RouteDeps): Router {
 
 export function createProjectWorkItemsRouter(deps: RouteDeps): Router {
   const router = Router({ mergeParams: true })
-  const { getPool, emit } = deps
+  const { getPool, emit, setCancelRequested } = deps
   const pool = () => getPool()
 
   router.get(
@@ -52,7 +52,7 @@ export function createProjectWorkItemsRouter(deps: RouteDeps): Router {
     validateQuery(queryArchived),
     asyncHandler(async (req, res) => {
       const includeArchived = req.query.archived === '1'
-      const rows = await listWorkItemsByProject(pool(), req.params.projectId, { includeArchived })
+      const rows = await listWorkItemsByProjectWithKanbanMeta(pool(), req.params.projectId, { includeArchived })
       res.json(rows)
     })
   )
@@ -121,6 +121,19 @@ export function createProjectWorkItemsRouter(deps: RouteDeps): Router {
       const row = await archiveWorkItem(pool(), req.params.projectId, req.params.id)
       if (!row) throw notFound('Work item not found or already archived')
       res.json(row)
+    })
+  )
+
+  router.post(
+    '/:id/cancel',
+    validateParams(paramProjectIdId),
+    asyncHandler(async (req, res) => {
+      const { projectId, id } = req.params
+      const row = await getWorkItem(pool(), projectId, id)
+      if (!row) throw notFound('Work item not found')
+      setCancelRequested(id)
+      emit('work_item.cancel', { work_item_id: id, project_id: projectId } as WorkItemCancelPayload)
+      res.status(204).end()
     })
   )
 

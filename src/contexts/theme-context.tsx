@@ -9,6 +9,22 @@ import {
 } from 'react'
 
 const STORAGE_KEY = 'agent-pm-theme'
+const COLOR_THEME_STORAGE_KEY = 'agent-pm-color-theme'
+
+export const COLOR_THEME_IDS = [
+  'default',
+  'zinc',
+  'stone',
+  'rose',
+  'blue',
+  'green',
+  'orange',
+  'violet',
+  'amber',
+  'slate',
+] as const
+
+export type ColorThemeId = (typeof COLOR_THEME_IDS)[number]
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -31,11 +47,28 @@ function applyTheme(effective: 'light' | 'dark') {
   document.documentElement.classList.toggle('dark', effective === 'dark')
 }
 
+function getStoredColorTheme(): ColorThemeId {
+  if (typeof window === 'undefined') return 'default'
+  const stored = localStorage.getItem(COLOR_THEME_STORAGE_KEY) as ColorThemeId | null
+  return COLOR_THEME_IDS.includes(stored as ColorThemeId) ? (stored as ColorThemeId) : 'default'
+}
+
+function applyColorThemeToDocument(id: ColorThemeId) {
+  if (id === 'default') {
+    document.documentElement.removeAttribute('data-theme')
+  } else {
+    document.documentElement.setAttribute('data-theme', id)
+  }
+}
+
 type ThemeContextValue = {
   theme: Theme
   setTheme: (theme: Theme) => void
   effectiveTheme: 'light' | 'dark'
   isDark: boolean
+  colorTheme: ColorThemeId
+  previewColorTheme: (id: ColorThemeId) => void
+  saveColorTheme: (id: ColorThemeId) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
@@ -45,10 +78,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>(() =>
     getEffectiveTheme(getStoredTheme())
   )
+  const [colorTheme, setColorThemeState] = useState<ColorThemeId>(getStoredColorTheme)
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next)
     localStorage.setItem(STORAGE_KEY, next)
+  }, [])
+
+  const previewColorTheme = useCallback((id: ColorThemeId) => {
+    applyColorThemeToDocument(id)
+  }, [])
+
+  const saveColorTheme = useCallback((id: ColorThemeId) => {
+    setColorThemeState(id)
+    localStorage.setItem(COLOR_THEME_STORAGE_KEY, id)
+    applyColorThemeToDocument(id)
   }, [])
 
   useEffect(() => {
@@ -56,6 +100,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     queueMicrotask(() => setEffectiveTheme(effective))
     applyTheme(effective)
   }, [theme])
+
+  useEffect(() => {
+    applyColorThemeToDocument(colorTheme)
+  }, [colorTheme])
 
   useEffect(() => {
     if (theme !== 'system') return
@@ -75,8 +123,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setTheme,
       effectiveTheme,
       isDark: effectiveTheme === 'dark',
+      colorTheme,
+      previewColorTheme,
+      saveColorTheme,
     }),
-    [theme, setTheme, effectiveTheme]
+    [theme, setTheme, effectiveTheme, colorTheme, previewColorTheme, saveColorTheme]
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

@@ -6,7 +6,7 @@ import { createMockPool, createMockGetPool, createMockEmit, appWithRouter, respo
 
 vi.mock('../../services/work-items.service.js', () => ({
   listAllWorkItems: vi.fn(),
-  listWorkItemsByProject: vi.fn(),
+  listWorkItemsByProjectWithKanbanMeta: vi.fn(),
   getWorkItem: vi.fn(),
   createWorkItem: vi.fn(),
   updateWorkItem: vi.fn(),
@@ -32,7 +32,7 @@ describe('work-items routes (GET /api/work-items)', () => {
   it('returns list of all work items', async () => {
     const rows = [{ id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }]
     vi.mocked(workItemsService.listAllWorkItems).mockResolvedValue(rows)
-    const deps = { getPool: createMockGetPool(pool), sse: { broadcastToAgent: () => {}, registerAgentStream: () => {}, registerStreamStatus: () => {} }, emit: createMockEmit(), upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() } }
+    const deps = { getPool: createMockGetPool(pool), sse: { broadcastToAgent: () => {}, registerAgentStream: () => {}, registerStreamStatus: () => {} }, emit: createMockEmit(), setCancelRequested: vi.fn(), upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() } }
     const router = createWorkItemsRouter(deps)
     const app = appWithRouter('/api/work-items', router)
     const res = await request(app).get('/api/work-items').expect(200)
@@ -42,7 +42,7 @@ describe('work-items routes (GET /api/work-items)', () => {
 
   it('includes archived when archived=1', async () => {
     vi.mocked(workItemsService.listAllWorkItems).mockResolvedValue([])
-    const deps = { getPool: createMockGetPool(pool), sse: { broadcastToAgent: () => {}, registerAgentStream: () => {}, registerStreamStatus: () => {} }, emit: createMockEmit(), upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() } }
+    const deps = { getPool: createMockGetPool(pool), sse: { broadcastToAgent: () => {}, registerAgentStream: () => {}, registerStreamStatus: () => {} }, emit: createMockEmit(), setCancelRequested: vi.fn(), upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() } }
     const router = createWorkItemsRouter(deps)
     const app = appWithRouter('/api/work-items', router)
     await request(app).get('/api/work-items?archived=1').expect(200)
@@ -52,11 +52,11 @@ describe('work-items routes (GET /api/work-items)', () => {
 
 describe('project work-items routes', () => {
   let pool: Pool
-  const deps = () => ({ getPool: createMockGetPool(pool), sse: { broadcastToAgent: () => {}, registerAgentStream: () => {}, registerStreamStatus: () => {} }, emit: createMockEmit(), upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() } })
+  const deps = () => ({ getPool: createMockGetPool(pool), sse: { broadcastToAgent: () => {}, registerAgentStream: () => {}, registerStreamStatus: () => {} }, emit: createMockEmit(), setCancelRequested: vi.fn(), upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() } })
   const basePath = '/api/projects/p1/work-items'
 
   beforeEach(() => {
-    vi.mocked(workItemsService.listWorkItemsByProject).mockReset()
+    vi.mocked(workItemsService.listWorkItemsByProjectWithKanbanMeta).mockReset()
     vi.mocked(workItemsService.getWorkItem).mockReset()
     vi.mocked(workItemsService.createWorkItem).mockReset()
     vi.mocked(workItemsService.updateWorkItem).mockReset()
@@ -67,14 +67,14 @@ describe('project work-items routes', () => {
   })
 
   describe('GET /', () => {
-    it('returns list of work items for project', async () => {
-      const rows = [{ id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }]
-      vi.mocked(workItemsService.listWorkItemsByProject).mockResolvedValue(rows)
+    it('returns list of work items for project with kanban meta', async () => {
+      const rows = [{ id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01', agent_name: 'Dev Agent', last_completion_duration_seconds: 120 }]
+      vi.mocked(workItemsService.listWorkItemsByProjectWithKanbanMeta).mockResolvedValue(rows)
       const router = createProjectWorkItemsRouter(deps())
       const app = appWithRouter('/api/projects/:projectId/work-items', router)
       const res = await request(app).get(basePath).expect(200)
       expect(res.body).toEqual(rows)
-      expect(workItemsService.listWorkItemsByProject).toHaveBeenCalledWith(pool, 'p1', { includeArchived: false })
+      expect(workItemsService.listWorkItemsByProjectWithKanbanMeta).toHaveBeenCalledWith(pool, 'p1', { includeArchived: false })
     })
   })
 
@@ -162,6 +162,27 @@ describe('project work-items routes', () => {
       const app = appWithRouter('/api/projects/:projectId/work-items', router)
       const res = await request(app).patch(`${basePath}/missing/archive`)
       expect(res.status).toBe(404)
+    })
+  })
+
+  describe('POST /:id/cancel', () => {
+    it('cancels work item and returns 204', async () => {
+      const row = { id: 'w1', project_id: 'p1', title: 'Task', description: null, assigned_to: null, priority: 'medium', depends_on: null, status: 'todo', require_approval: false, work_item_type: 'Task', archived_at: null, created_at: '2025-01-01', updated_at: '2025-01-01' }
+      vi.mocked(workItemsService.getWorkItem).mockResolvedValue(row)
+      const setCancelRequested = vi.fn()
+      const emit = vi.fn()
+      const router = createProjectWorkItemsRouter({ ...deps(), setCancelRequested, emit })
+      const app = appWithRouter('/api/projects/:projectId/work-items', router)
+      await request(app).post(`${basePath}/w1/cancel`).expect(204)
+      expect(setCancelRequested).toHaveBeenCalledWith('w1')
+      expect(emit).toHaveBeenCalledWith('work_item.cancel', { work_item_id: 'w1', project_id: 'p1' })
+    })
+
+    it('returns 404 when work item not found', async () => {
+      vi.mocked(workItemsService.getWorkItem).mockResolvedValue(null)
+      const router = createProjectWorkItemsRouter(deps())
+      const app = appWithRouter('/api/projects/:projectId/work-items', router)
+      await request(app).post(`${basePath}/missing/cancel`).expect(404)
     })
   })
 

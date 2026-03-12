@@ -2,8 +2,8 @@
  * LangChain model factory: creates the appropriate chat model for a given provider id.
  * Supports: ollama (OpenAI-compatible API), openai, anthropic.
  *
- * Cursor is not created here: agent runs use the Cursor CLI via cursor-cli-runner (see
- * langchain-runner). Model list for Cursor comes from cursor.service (cursor agent models).
+ * Cursor and Gemini are not created here: agent runs use the CLI via cursor-cli-runner
+ * and gemini-cli-runner (see langchain-runner). Model lists come from cursor.service and gemini.service.
  */
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
@@ -60,6 +60,10 @@ export function createModel(
       throw new Error(
         'Cursor uses the CLI for agent runs, not the API. createModel("cursor") is not used; runAgentStream/runAgent handle cursor via cursor-cli-runner.'
       )
+    case 'gemini':
+      throw new Error(
+        'Gemini uses the CLI for agent runs, not the API. createModel("gemini") is not used; runAgentStream/runAgent handle gemini via gemini-cli-runner.'
+      )
     case 'anthropic': {
       const apiKey = (config.apiKey as string) ?? serverConfig.anthropic.apiKey
       const model = (modelName ?? config.model ?? serverConfig.anthropic.defaultModel) as string
@@ -72,7 +76,7 @@ export function createModel(
     }
     default:
       throw new Error(
-        `Unknown AI provider: ${providerId}. Supported: ollama, openai, anthropic (cursor uses CLI, not createModel)`
+        `Unknown AI provider: ${providerId}. Supported: ollama, openai, anthropic (cursor and gemini use CLI, not createModel)`
       )
   }
 }

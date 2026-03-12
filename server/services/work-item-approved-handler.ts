@@ -46,6 +46,8 @@ export type WorkItemApprovedHandlerDeps = {
     context: unknown,
     options?: { messages?: unknown[]; toolContext?: import('../agent/langchain-tools.js').WorkItemToolContext }
   ) => AsyncIterable<AgentStreamChunk>
+  isCancelRequested: (workItemId: string) => boolean
+  clearCancelRequested: (workItemId: string) => void
   updateWorkItem: (
     pool: Pool,
     projectId: string,
@@ -123,6 +125,8 @@ export function createWorkItemApprovedHandler(
     buildContextForWorkItemApproved,
     getInitialMessages,
     runAgentStream,
+    isCancelRequested,
+    clearCancelRequested,
     updateWorkItem,
     addWorkItemComment,
     listAgents,
@@ -180,6 +184,10 @@ export function createWorkItemApprovedHandler(
         messages: messages as import('../agent/types.js').ChatMessage[],
         toolContext,
       })) {
+        if (isCancelRequested(payload.work_item_id)) {
+          clearCancelRequested(payload.work_item_id)
+          break
+        }
         if (chunk.type === 'tool_call') {
           broadcaster.broadcastToAgent(payload.agent_id, 'stream_chunk', {
             chunk: `Tool: ${chunk.name}`,
@@ -193,6 +201,7 @@ export function createWorkItemApprovedHandler(
         }
       }
 
+      clearCancelRequested(payload.work_item_id)
       broadcaster.broadcastToAgent(payload.agent_id, 'stream_end', {})
     } catch (e) {
       logError('[work_item.approved] Agent stream error:', e)

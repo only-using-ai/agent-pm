@@ -6,6 +6,7 @@
 export const AI_PROVIDERS = [
   { id: 'ollama', label: 'Ollama' },
   { id: 'cursor', label: 'Cursor' },
+  { id: 'gemini', label: 'Gemini' },
   { id: 'anthropic', label: 'Claude' },
 ] as const
 

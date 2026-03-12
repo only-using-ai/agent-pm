@@ -106,8 +106,9 @@ function actionKey(toolName: string, args: Record<string, unknown>): string | nu
 /**
  * Process assistant text: when toolContext is set, look for lines
  * __AGENT_ACTION__ <tool> <json>. Execute at most once per (tool, args); yield confirmation.
+ * Exported for use by gemini-cli-runner.
  */
-async function* processContentWithActions(
+export async function* processContentWithActions(
   text: string,
   toolContext: WorkItemToolContext,
   contentBuffer: { current: string },

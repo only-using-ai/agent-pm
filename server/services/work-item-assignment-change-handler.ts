@@ -33,6 +33,8 @@ export type WorkItemAssignmentChangeHandlerDeps = {
     context: unknown,
     options?: { messages?: unknown[]; toolContext?: import('../agent/langchain-tools.js').WorkItemToolContext }
   ) => AsyncIterable<AgentStreamChunk>
+  isCancelRequested: (workItemId: string) => boolean
+  clearCancelRequested: (workItemId: string) => void
   updateWorkItem: (
     pool: Pool,
     projectId: string,
@@ -98,6 +100,8 @@ export function createWorkItemAssignmentChangeHandler(
     buildContextForWorkItemAssignmentChange,
     getInitialMessages,
     runAgentStream,
+    isCancelRequested,
+    clearCancelRequested,
     updateWorkItem,
     addWorkItemComment,
     listAgents,
@@ -162,6 +166,10 @@ export function createWorkItemAssignmentChangeHandler(
         messages: messages as import('../agent/types.js').ChatMessage[],
         toolContext,
       })) {
+        if (isCancelRequested(payload.id)) {
+          clearCancelRequested(payload.id)
+          break
+        }
         if (chunk.type === 'tool_call') {
           broadcaster.broadcastToAgent(agentId, 'stream_chunk', {
             chunk: `Tool: ${chunk.name}`,
@@ -175,6 +183,7 @@ export function createWorkItemAssignmentChangeHandler(
         }
       }
 
+      clearCancelRequested(payload.id)
       broadcaster.broadcastToAgent(agentId, 'stream_end', {})
     } catch (e) {
       logError('[work_item.assignment_change] Agent stream error:', e)

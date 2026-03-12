@@ -17,7 +17,6 @@ export type CommandPaletteItem =
   | { type: 'page'; id: string; label: string; url: string }
 
 const CREATE_ACTIONS: CommandPaletteItem[] = [
-  { type: 'action', id: 'action:create-work-item', label: 'Create work item', url: '/work-items' },
   { type: 'action', id: 'action:create-agent', label: 'Create agent', url: '/agents/new' },
   { type: 'action', id: 'action:create-project', label: 'Create project', url: '/projects/new' },
 ]
@@ -25,10 +24,10 @@ const CREATE_ACTIONS: CommandPaletteItem[] = [
 const APP_PAGES: CommandPaletteItem[] = [
   { type: 'page', id: 'page:dashboard', label: 'Dashboard', url: '/' },
   { type: 'page', id: 'page:inbox', label: 'Inbox', url: '/inbox' },
-  { type: 'page', id: 'page:work-items', label: 'Work Items', url: '/work-items' },
   { type: 'page', id: 'page:assets', label: 'Assets', url: '/assets' },
   { type: 'page', id: 'page:mcp', label: 'MCP and Tools', url: '/mcp' },
   { type: 'page', id: 'page:profile', label: 'Profile', url: '/profile' },
+  { type: 'page', id: 'page:preferences', label: 'Preferences', url: '/preferences' },
   { type: 'page', id: 'page:settings', label: 'Settings', url: '/settings' },
 ]
 
@@ -221,7 +220,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         onKeyDown={handleKeyDown}
       />
       <div
-        className="relative z-10 w-full max-w-xl rounded-xl border border-border bg-card shadow-lg"
+        className="relative z-10 w-full max-w-xl rounded-xl border-2 border-border bg-card shadow-xl ring-2 ring-foreground/10"
         onKeyDown={handleKeyDown}
       >
         <div className="flex items-center gap-2 border-b border-border px-3">

@@ -9,6 +9,7 @@ import type {
   WorkItemWithProjectRow,
   WorkItemWithCommentsRow,
   WorkItemCommentRow,
+  WorkItemKanbanRow,
   CreateWorkItemInput,
   UpdateWorkItemInput,
   ListOptions,
@@ -75,6 +76,30 @@ export async function listWorkItemsByProject(
     [projectId]
   )
   return rows as WorkItemRow[]
+}
+
+export async function listWorkItemsByProjectWithKanbanMeta(
+  pool: Pool,
+  projectId: string,
+  options: ListOptions = {}
+): Promise<WorkItemKanbanRow[]> {
+  const where = options.includeArchived
+    ? 'WHERE w.project_id = $1'
+    : 'WHERE w.project_id = $1 AND w.archived_at IS NULL'
+  const { rows } = await pool.query(
+    `SELECT w.id, w.project_id, w.title, w.description, w.assigned_to, w.priority, w.depends_on, w.status, w.require_approval, w.work_item_type, w.archived_at, w.created_at, w.updated_at,
+            a.name AS agent_name,
+            (SELECT EXTRACT(EPOCH FROM (s.end_time - s.start_time))::int
+             FROM work_item_sessions s
+             WHERE s.work_item_id = w.id AND s.end_time IS NOT NULL AND s.is_cancelled = false
+             ORDER BY s.end_time DESC LIMIT 1) AS last_completion_duration_seconds
+     FROM work_items w
+     LEFT JOIN agents a ON a.id = w.assigned_to
+     ${where}
+     ORDER BY w.created_at DESC`,
+    [projectId]
+  )
+  return rows as WorkItemKanbanRow[]
 }
 
 export async function listWorkItemsByAgent(
@@ -215,6 +240,15 @@ export async function updateWorkItem(
     await setWorkItemAssets(pool, projectId, id, input.asset_ids)
   }
 
+  let previousStatus: string | undefined
+  if (input.status !== undefined) {
+    const { rows: prev } = await pool.query(
+      `SELECT status FROM work_items WHERE id = $1 AND project_id = $2`,
+      [id, projectId]
+    )
+    previousStatus = (prev[0] as { status: string } | undefined)?.status
+  }
+
   if (updates.length <= 1 && input.asset_ids === undefined) {
     const { rows: r } = await pool.query(
       `SELECT ${WORK_ITEM_COLUMNS} FROM work_items WHERE id = $1 AND project_id = $2`,
@@ -229,7 +263,33 @@ export async function updateWorkItem(
      RETURNING ${WORK_ITEM_COLUMNS}`,
     values
   )
-  return (rows[0] as WorkItemRow) ?? null
+  const row = (rows[0] as WorkItemRow) ?? null
+  if (!row) return null
+
+  const newStatus = input.status !== undefined ? input.status.trim() : row.status
+  if (previousStatus !== undefined && newStatus !== previousStatus) {
+    if (newStatus === 'in_progress' && previousStatus !== 'in_progress') {
+      await pool.query(
+        `INSERT INTO work_item_sessions (work_item_id, agent_id) VALUES ($1, $2)`,
+        [id, row.assigned_to ?? null]
+      )
+    } else if (
+      (newStatus === 'completed' || newStatus === 'canceled') &&
+      previousStatus === 'in_progress'
+    ) {
+      await pool.query(
+        `UPDATE work_item_sessions SET end_time = now(), is_cancelled = $1
+         WHERE id = (
+           SELECT id FROM work_item_sessions
+           WHERE work_item_id = $2 AND end_time IS NULL
+           ORDER BY start_time DESC LIMIT 1
+         )`,
+        [newStatus === 'canceled', id]
+      )
+    }
+  }
+
+  return row
 }
 
 export async function archiveWorkItem(

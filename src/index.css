@@ -76,6 +76,106 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Color theme overrides (data-theme on html). default uses :root/.dark above. */
+[data-theme="zinc"] {
+    --primary: oklch(0.207 0.006 247.896);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.207 0.006 247.896);
+}
+.dark[data-theme="zinc"] {
+    --primary: oklch(0.931 0.012 247.896);
+    --primary-foreground: oklch(0.207 0.006 247.896);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+}
+
+[data-theme="stone"] {
+    --primary: oklch(0.278 0.013 56.043);
+    --primary-foreground: oklch(0.985 0.002 106.423);
+    --sidebar-primary: oklch(0.278 0.013 56.043);
+}
+.dark[data-theme="stone"] {
+    --primary: oklch(0.908 0.014 73.684);
+    --primary-foreground: oklch(0.278 0.013 56.043);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+}
+
+[data-theme="rose"] {
+    --primary: oklch(0.396 0.141 353.717);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.396 0.141 353.717);
+}
+.dark[data-theme="rose"] {
+    --primary: oklch(0.704 0.191 22.216);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.645 0.246 16.439);
+}
+
+[data-theme="blue"] {
+    --primary: oklch(0.488 0.243 264.376);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+}
+.dark[data-theme="blue"] {
+    --primary: oklch(0.704 0.191 252.894);
+    --primary-foreground: oklch(0.205 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+}
+
+[data-theme="green"] {
+    --primary: oklch(0.398 0.128 164.364);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.398 0.128 164.364);
+}
+.dark[data-theme="green"] {
+    --primary: oklch(0.696 0.17 162.48);
+    --primary-foreground: oklch(0.205 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+}
+
+[data-theme="orange"] {
+    --primary: oklch(0.558 0.202 47.708);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.558 0.202 47.708);
+}
+.dark[data-theme="orange"] {
+    --primary: oklch(0.769 0.188 70.08);
+    --primary-foreground: oklch(0.205 0 0);
+    --sidebar-primary: oklch(0.627 0.265 303.9);
+}
+
+[data-theme="violet"] {
+    --primary: oklch(0.488 0.243 276.966);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 276.966);
+}
+.dark[data-theme="violet"] {
+    --primary: oklch(0.627 0.265 303.9);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+}
+
+[data-theme="amber"] {
+    --primary: oklch(0.585 0.202 84.429);
+    --primary-foreground: oklch(0.205 0 0);
+    --sidebar-primary: oklch(0.585 0.202 84.429);
+}
+.dark[data-theme="amber"] {
+    --primary: oklch(0.828 0.189 84.429);
+    --primary-foreground: oklch(0.205 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+}
+
+[data-theme="slate"] {
+    --primary: oklch(0.278 0.025 264.695);
+    --primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.278 0.025 264.695);
+}
+.dark[data-theme="slate"] {
+    --primary: oklch(0.704 0.04 256.788);
+    --primary-foreground: oklch(0.205 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+}
+
 @source "../node_modules/streamdown/dist/*.js";
 
 @theme inline {

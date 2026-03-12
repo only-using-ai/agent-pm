@@ -107,6 +107,12 @@ export type WorkItemRow = {
 
 export type WorkItemWithProjectRow = WorkItemRow & { project_name: string }
 
+/** Work item row with kanban card meta: agent name and last completed session duration */
+export type WorkItemKanbanRow = WorkItemRow & {
+  agent_name: string | null
+  last_completion_duration_seconds: number | null
+}
+
 export type WorkItemCommentRow = {
   id: string
   work_item_id: string

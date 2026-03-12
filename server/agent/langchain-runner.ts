@@ -22,12 +22,14 @@ import type { BaseMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { runCursorCLIStream, runCursorCLI } from './cursor-cli-runner.js'
+import { runGeminiCLIStream, runGeminiCLI } from './gemini-cli-runner.js'
 
 const DEFAULT_MODELS: Record<string, string> = {
   ollama: 'llama3',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-5-sonnet-20241022',
   cursor: 'claude-4.5-sonnet-thinking',
+  gemini: 'auto',
 }
 
 /** Build provider:model string for createDeepAgent so it uses initChatModel (same dependency tree → getName/bindTools work). */
@@ -90,6 +92,17 @@ export async function* runAgentStream(
   if (provider === 'cursor') {
     const model = options?.model ?? agent.model ?? DEFAULT_MODELS.cursor
     yield* runCursorCLIStream(messages, {
+      model: model ?? undefined,
+      toolContext: options?.toolContext,
+      workspace: options?.workspace ?? undefined,
+    })
+    return
+  }
+
+  // Gemini: use CLI (gemini -p ... --output-format stream-json). Same __AGENT_ACTION__ handling as Cursor when toolContext is set.
+  if (provider === 'gemini') {
+    const model = options?.model ?? agent.model ?? DEFAULT_MODELS.gemini
+    yield* runGeminiCLIStream(messages, {
       model: model ?? undefined,
       toolContext: options?.toolContext,
       workspace: options?.workspace ?? undefined,
@@ -290,6 +303,16 @@ export async function runAgent(
   if (provider === 'cursor') {
     const model = options?.model ?? agent.model ?? DEFAULT_MODELS.cursor
     const { content } = await runCursorCLI(messages, {
+      model: model ?? undefined,
+      workspace: options?.workspace ?? undefined,
+    })
+    return { content }
+  }
+
+  // Gemini: use CLI (--output-format json)
+  if (provider === 'gemini') {
+    const model = options?.model ?? agent.model ?? DEFAULT_MODELS.gemini
+    const { content } = await runGeminiCLI(messages, {
       model: model ?? undefined,
       workspace: options?.workspace ?? undefined,
     })

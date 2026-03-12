@@ -10,5 +10,6 @@ export type RouteDeps = {
   getPool: () => Pool
   sse: SseBroadcaster
   emit: (event: string, payload: unknown) => void
+  setCancelRequested: (workItemId: string) => void
   upload: { single: (name: string) => import('express').RequestHandler }
 }

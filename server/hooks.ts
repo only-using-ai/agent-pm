@@ -67,12 +67,19 @@ export type WorkItemApprovedPayload = {
   body: string
 }
 
+/** Payload when a user cancels active work on a work item. Stops the agent stream for that item. */
+export type WorkItemCancelPayload = {
+  work_item_id: string
+  project_id: string
+}
+
 export type HookEvent =
   | 'work_item.created'
   | 'work_item.comment'
   | 'work_item.commented'
   | 'work_item.assignment_change'
   | 'work_item.approved'
+  | 'work_item.cancel'
 
 export type HookHandler<T> = (payload: T) => void | Promise<void>
 
@@ -103,7 +110,9 @@ export function on<K extends HookEvent>(
           ? HookHandler<WorkItemAssignmentChangePayload>
           : K extends 'work_item.approved'
             ? HookHandler<WorkItemApprovedPayload>
-            : never
+            : K extends 'work_item.cancel'
+              ? HookHandler<WorkItemCancelPayload>
+              : never
 ): () => void {
   const set = getListeners(event)
   set.add(handler as HookHandler<unknown>)

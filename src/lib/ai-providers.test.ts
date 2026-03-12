@@ -3,10 +3,11 @@ import { AI_PROVIDERS, type AiProviderId } from './ai-providers'
 
 describe('ai-providers', () => {
   it('exports expected provider ids', () => {
-    expect(AI_PROVIDERS).toHaveLength(3)
+    expect(AI_PROVIDERS).toHaveLength(4)
     const ids = AI_PROVIDERS.map((p) => p.id)
     expect(ids).toContain('ollama')
     expect(ids).toContain('cursor')
+    expect(ids).toContain('gemini')
     expect(ids).toContain('anthropic')
   })
 

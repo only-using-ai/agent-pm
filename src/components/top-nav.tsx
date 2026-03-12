@@ -12,7 +12,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
-import { Search, User, LogOut, Moon, Sun } from 'lucide-react'
+import { Search, User, LogOut, Moon, Sun, Settings } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/theme-context'
 import { CommandPalette } from '@/components/command-palette'
@@ -115,6 +115,10 @@ export function TopNav() {
           <DropdownMenuItem onClick={() => navigate('/profile')}>
             <User className="mr-2 size-4" />
             Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate('/preferences')}>
+            <Settings className="mr-2 size-4" />
+            Preferences
           </DropdownMenuItem>
           <DropdownMenuItem>
             <LogOut className="mr-2 size-4" />

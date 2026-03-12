@@ -15,6 +15,7 @@ const DEFAULT_OLLAMA_MODEL = 'llama3'
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini'
 const DEFAULT_ANTHROPIC_MODEL = 'claude-3-5-sonnet-20241022'
 const DEFAULT_CURSOR_MODEL = 'claude-4.5-sonnet-thinking'
+const DEFAULT_GEMINI_MODEL = 'auto'
 const DEFAULT_EMBEDDED_DATA_DIR = '.agent-pm/db'
 const DEFAULT_EMBEDDED_PORT = 54329
 
@@ -120,6 +121,20 @@ export function getCursorDefaultModel(): string {
 }
 
 /**
+ * Path to the Gemini CLI binary. Used for CLI agent runs.
+ * Env: GEMINI_CLI_PATH. When unset, uses "gemini" (must be on PATH).
+ */
+export function getGeminiCliPath(): string {
+  const envPath = process.env.GEMINI_CLI_PATH?.trim()
+  return envPath ?? 'gemini'
+}
+
+/** Gemini default model for CLI agent runs. Env: GEMINI_MODEL. Aliases: auto, pro, flash, flash-lite. */
+export function getGeminiDefaultModel(): string {
+  return process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL
+}
+
+/**
  * Single config object for convenience (e.g. passing to agent/model code).
  * All values are read from env at call time.
  */
@@ -169,6 +184,14 @@ export const config = {
     },
     get defaultModel() {
       return getCursorDefaultModel()
+    },
+  },
+  gemini: {
+    get cliPath() {
+      return getGeminiCliPath()
+    },
+    get defaultModel() {
+      return getGeminiDefaultModel()
     },
   },
 } as const

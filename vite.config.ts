@@ -72,6 +72,7 @@ export default defineConfig({
         'server/hooks.ts',
         'server/agent/index.ts',
         'server/agent/cursor-cli-runner.ts',
+        'server/agent/gemini-cli-runner.ts',
         'server/agent/mcp-langchain.ts',
         'server/agent/langchain-tools.ts',
         'server/agent/types.ts',

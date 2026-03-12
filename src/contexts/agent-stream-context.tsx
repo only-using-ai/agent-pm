@@ -74,13 +74,30 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
     es.onmessage = (e) => {
       try {
         const { event, data } = JSON.parse(e.data) as {
-          event: StreamEvent
+          event: StreamEvent | 'active_streams_snapshot'
           data: {
             agentId?: string
             work_item_id?: string
             project_id?: string
             status?: string
+            active_streams?: Array<{ agentId: string; work_item_id: string }>
           }
+        }
+        if (event === 'active_streams_snapshot' && Array.isArray(data?.active_streams)) {
+          const list = data.active_streams as Array<{ agentId: string; work_item_id: string }>
+          const agentIds = new Set(list.map((a) => a.agentId))
+          const workItemIds = new Set(list.map((a) => a.work_item_id))
+          const byAgent: Record<string, string> = {}
+          const refMap = new Map<string, string>()
+          for (const a of list) {
+            byAgent[a.agentId] = a.work_item_id
+            refMap.set(a.agentId, a.work_item_id)
+          }
+          setStreamingAgentIds(agentIds)
+          setActiveWorkItemIds(workItemIds)
+          setCurrentWorkItemIdByAgent(byAgent)
+          agentIdToWorkItemIdRef.current = refMap
+          return
         }
         const agentId = data?.agentId
         if (event === 'work_item_updated' && data?.work_item_id && data?.project_id && data?.status) {

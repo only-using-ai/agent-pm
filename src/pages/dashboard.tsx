@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { listAllWorkItems, type WorkItemWithProject } from '@/lib/api'
 import { useAgents } from '@/contexts/agents-context'
 import { useAgentStream } from '@/contexts/agent-stream-context'
@@ -24,7 +24,6 @@ import {
   FolderKanban,
   ListTodo,
   Loader2,
-  Plus,
   ThumbsDown,
   ThumbsUp,
 } from 'lucide-react'
@@ -32,7 +31,6 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export function DashboardPage() {
-  const navigate = useNavigate()
   const { agents, loading: agentsLoading } = useAgents()
   const { data: inboxItems = [], isLoading: inboxLoading } = useInboxQuery()
   const approveInbox = useApproveInboxItemMutation()
@@ -91,19 +89,11 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground mt-1">
-            Overview of agents, projects, and work in progress.
-          </p>
-        </div>
-        <Button
-          onClick={() => navigate('/work-items', { state: { openCreate: true } })}
-        >
-          <Plus className="size-4" />
-          New work item
-        </Button>
+      <div>
+        <h2 className="text-2xl font-semibold tracking-tight">Dashboard</h2>
+        <p className="text-muted-foreground mt-1">
+          Overview of agents, projects, and work in progress.
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

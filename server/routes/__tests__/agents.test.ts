@@ -26,6 +26,10 @@ vi.mock('../../services/cursor.service.js', () => ({
   fetchCursorModels: vi.fn(),
 }))
 
+vi.mock('../../services/gemini.service.js', () => ({
+  fetchGeminiModels: vi.fn(),
+}))
+
 vi.mock('../../services/anthropic.service.js', () => ({
   fetchAnthropicModels: vi.fn(),
 }))
@@ -38,6 +42,7 @@ import * as agentsService from '../../services/agents.service.js'
 import * as workItemsService from '../../services/work-items.service.js'
 import * as ollamaService from '../../services/ollama.service.js'
 import * as cursorService from '../../services/cursor.service.js'
+import * as geminiService from '../../services/gemini.service.js'
 import * as anthropicService from '../../services/anthropic.service.js'
 
 describe('agents routes', () => {
@@ -459,6 +464,7 @@ describe('AI models routes', () => {
   beforeEach(() => {
     vi.mocked(ollamaService.fetchOllamaModels).mockReset()
     vi.mocked(cursorService.fetchCursorModels).mockReset()
+    vi.mocked(geminiService.fetchGeminiModels).mockReset()
     vi.mocked(anthropicService.fetchAnthropicModels).mockReset()
     pool = createMockPool(vi.fn())
   })
@@ -474,7 +480,7 @@ describe('AI models routes', () => {
     expect(res.body.models).toEqual([{ name: 'llama3' }])
   })
 
-  it('GET /ollama/models returns 502 when not ok', async () => {
+  it('GET /ollama/models returns 200 with empty array when not ok', async () => {
     vi.mocked(ollamaService.fetchOllamaModels).mockResolvedValue({
       ok: false,
       error: 'Connection refused',
@@ -483,8 +489,8 @@ describe('AI models routes', () => {
     const router = createAiModelsRouter({ getPool: createMockGetPool(pool) })
     const app = appWithRouter('/api', router)
     const res = await request(app).get('/api/ollama/models')
-    expect(res.status).toBe(502)
-    expect(String(responseBody(res).error ?? (res as { text?: string }).text)).toContain('Connection refused')
+    expect(res.status).toBe(200)
+    expect(res.body.models).toEqual([])
   })
 
   it('GET /cursor/models returns 200 with models when ok', async () => {
@@ -509,6 +515,30 @@ describe('AI models routes', () => {
     const res = await request(app).get('/api/cursor/models')
     expect(res.status).toBe(502)
     expect(String(responseBody(res).error ?? (res as { text?: string }).text)).toContain('Unauthorized')
+  })
+
+  it('GET /gemini/models returns 200 with models when ok', async () => {
+    vi.mocked(geminiService.fetchGeminiModels).mockResolvedValue({
+      ok: true,
+      models: ['auto', 'pro', 'flash'],
+    })
+    const router = createAiModelsRouter({ getPool: createMockGetPool(pool) })
+    const app = appWithRouter('/api', router)
+    const res = await request(app).get('/api/gemini/models').expect(200)
+    expect(res.body.models).toEqual(['auto', 'pro', 'flash'])
+  })
+
+  it('GET /gemini/models returns 502 when not ok', async () => {
+    vi.mocked(geminiService.fetchGeminiModels).mockResolvedValue({
+      ok: false,
+      error: 'Gemini CLI not found',
+      detail: undefined,
+    })
+    const router = createAiModelsRouter({ getPool: createMockGetPool(pool) })
+    const app = appWithRouter('/api', router)
+    const res = await request(app).get('/api/gemini/models')
+    expect(res.status).toBe(502)
+    expect(String(responseBody(res).error ?? (res as { text?: string }).text)).toContain('Gemini')
   })
 
   it('GET /anthropic/models returns 200 with models when ok', async () => {

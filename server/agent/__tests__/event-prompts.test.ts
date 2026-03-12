@@ -87,6 +87,13 @@ describe('event-prompts', () => {
       expect(vars.CURSOR_ACTIONS_BLOCK).toContain('__AGENT_ACTION__')
     })
 
+    it('includes CURSOR_ACTIONS_BLOCK when provider is gemini', () => {
+      const agent: AgentRecord = { ...baseAgent, ai_provider: 'gemini' }
+      const payload = { id: 'wi-1', project_id: 'p-1', title: 'T', require_approval: false }
+      const vars = getWorkItemCreatedPromptVariables(agent, payload)
+      expect(vars.CURSOR_ACTIONS_BLOCK).toContain('__AGENT_ACTION__')
+    })
+
     it('includes areaContext and projectContext from options', () => {
       const vars = getWorkItemCreatedPromptVariables(baseAgent, { id: 'wi-1', project_id: 'p-1', title: 'T', require_approval: false }, {
         areaContext: 'Area',

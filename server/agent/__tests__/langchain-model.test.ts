@@ -19,6 +19,10 @@ describe('langchain-model', () => {
     ).toThrow(/Cursor uses the CLI/)
   })
 
+  it('throws for gemini (gemini uses CLI via gemini-cli-runner)', () => {
+    expect(() => createModel('gemini', { model: 'auto' })).toThrow(/Gemini uses the CLI/)
+  })
+
   it('creates ChatAnthropic for anthropic', () => {
     const model = createModel('anthropic', {
       model: 'claude-3-5-sonnet-20241022',

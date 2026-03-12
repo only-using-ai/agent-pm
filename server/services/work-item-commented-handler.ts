@@ -35,6 +35,8 @@ export type WorkItemCommentedHandlerDeps = {
     context: unknown,
     options?: { messages?: unknown[]; toolContext?: import('../agent/langchain-tools.js').WorkItemToolContext }
   ) => AsyncIterable<AgentStreamChunk>
+  isCancelRequested: (workItemId: string) => boolean
+  clearCancelRequested: (workItemId: string) => void
   updateWorkItem: (
     pool: Pool,
     projectId: string,
@@ -110,8 +112,10 @@ export function createWorkItemCommentedHandler(
     getContextContent,
     buildContextForWorkItemCommented,
     getInitialMessages,
-    runAgentStream,
-    updateWorkItem,
+        runAgentStream,
+        isCancelRequested,
+        clearCancelRequested,
+        updateWorkItem,
     addWorkItemComment,
     createWorkItem,
     emitWorkItemCreated,
@@ -187,10 +191,16 @@ export function createWorkItemCommentedHandler(
           createInfoRequest,
         }
 
+        let cancelled = false
         for await (const chunk of runAgentStream(agent, context, {
           messages: messages as import('../agent/types.js').ChatMessage[],
           toolContext,
         })) {
+          if (isCancelRequested(payload.work_item_id)) {
+            clearCancelRequested(payload.work_item_id)
+            cancelled = true
+            break
+          }
           if (chunk.type === 'tool_call') {
             broadcaster.broadcastToAgent(agentId, 'stream_chunk', {
               chunk: `Tool: ${chunk.name}`,
@@ -204,7 +214,9 @@ export function createWorkItemCommentedHandler(
           }
         }
 
+        if (!cancelled) clearCancelRequested(payload.work_item_id)
         broadcaster.broadcastToAgent(agentId, 'stream_end', {})
+        if (cancelled) return
       } catch (e) {
         logError('[work_item.commented] Agent stream error:', e)
         broadcaster.broadcastToAgent(agentId, 'stream_error', {

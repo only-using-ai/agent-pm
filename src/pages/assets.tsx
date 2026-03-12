@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
   ChevronDown,
@@ -328,7 +327,6 @@ export function AssetsPage() {
   const [commentPanelOpen, setCommentPanelOpen] = useState(false)
   const [pendingHighlight, setPendingHighlight] = useState<string | null>(null)
   const fileContentRef = useRef<HTMLDivElement>(null)
-  const navigate = useNavigate()
 
   const updateSelectionRect = useCallback(() => {
     const sel = window.getSelection()
@@ -874,55 +872,16 @@ export function AssetsPage() {
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2 pb-4 border-t border-border shrink-0 px-4 mt-2">
-              {fileComments.length > 0 ? (
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const assetName = selectedFile?.name ?? 'Asset'
-                    const description = [
-                      `**Asset:** ${assetName}`,
-                      '',
-                      '**Comments:**',
-                      ...fileComments.flatMap((fc) => {
-                        const parts: string[] = []
-                        if (fc.highlightedText) {
-                          parts.push('', '> ' + fc.highlightedText.replace(/\n/g, '\n> '), '')
-                        }
-                        parts.push(fc.comment)
-                        return parts
-                      }),
-                    ]
-                      .filter(Boolean)
-                      .join('\n')
-                    navigate('/work-items', {
-                      state: {
-                        openCreate: true,
-                        title: assetName,
-                        description,
-                        project_id: selectedProjectId ?? undefined,
-                      },
-                    })
-                    setSelectedFile(null)
-                    setFileContent(null)
-                    setFileContentError(null)
-                    setFileComments([])
-                    setCommentInput('')
-                  }}
-                >
-                  Create work item
-                </Button>
-              ) : (
-                <SheetClose
-                  render={
-                    <Button
-                      variant="outline"
-                      className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium"
-                    >
-                      Close
-                    </Button>
-                  }
-                />
-              )}
+              <SheetClose
+                render={
+                  <Button
+                    variant="outline"
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium"
+                  >
+                    Close
+                  </Button>
+                }
+              />
             </div>
           </div>
         </SheetContent>

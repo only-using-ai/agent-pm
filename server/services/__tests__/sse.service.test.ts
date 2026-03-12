@@ -35,9 +35,11 @@ describe('sse.service', () => {
       broadcaster.registerStreamStatus(mockRes as any)
       broadcaster.broadcastToAgent('agent-1', 'stream_start', { work_item_id: 'wi-1' })
       expect(mockRes.write).toHaveBeenCalled()
-      const payload = mockRes.write.mock.calls[0][0]
-      expect(payload).toContain('stream_start')
-      expect(payload).toContain('agentId')
+      const streamStartPayload = mockRes.write.mock.calls.find(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('stream_start')
+      )?.[0]
+      expect(streamStartPayload).toBeDefined()
+      expect(streamStartPayload).toContain('agentId')
     })
   })
 
@@ -61,12 +63,44 @@ describe('sse.service', () => {
   })
 
   describe('registerStreamStatus', () => {
+    it('sends active_streams_snapshot on connect so clients restore indicators after refresh', () => {
+      broadcaster.registerStreamStatus(mockRes as any)
+      const snapshotCall = mockRes.write.mock.calls.find(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('active_streams_snapshot')
+      )?.[0]
+      expect(snapshotCall).toBeDefined()
+      expect(snapshotCall).toContain('active_streams')
+    })
+
+    it('snapshot includes current active streams (stream_start adds, stream_end removes)', () => {
+      broadcaster.broadcastToAgent('agent-1', 'stream_start', { work_item_id: 'wi-1' })
+      const mockRes2 = {
+        write: vi.fn(),
+        on: vi.fn(),
+        socket: { setNoDelay: vi.fn() },
+      }
+      broadcaster.registerStreamStatus(mockRes2 as any)
+      const snapshotCall = mockRes2.write.mock.calls.find(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('active_streams_snapshot')
+      )?.[0]
+      expect(snapshotCall).toContain('agent-1')
+      expect(snapshotCall).toContain('wi-1')
+      broadcaster.broadcastToAgent('agent-1', 'stream_end', {})
+      const mockRes3 = { write: vi.fn(), on: vi.fn(), socket: { setNoDelay: vi.fn() } }
+      broadcaster.registerStreamStatus(mockRes3 as any)
+      const snapshotCall2 = mockRes3.write.mock.calls.find(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('active_streams_snapshot')
+      )?.[0]
+      expect(snapshotCall2).toContain('"active_streams":[]')
+    })
+
     it('unregisters on close', () => {
       broadcaster.registerStreamStatus(mockRes as any)
+      const writeCountAfterRegister = mockRes.write.mock.calls.length
       const onClose = mockRes.on.mock.calls.find((c: string[]) => c[0] === 'close')?.[1]
       onClose!()
       broadcaster.broadcastToAgent('a', 'stream_end', {})
-      expect(mockRes.write).not.toHaveBeenCalled()
+      expect(mockRes.write.mock.calls.length).toBe(writeCountAfterRegister)
     })
   })
 
