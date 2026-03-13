@@ -6,6 +6,7 @@ import {
   createProject,
   updateProject,
   archiveProject,
+  completeProject,
 } from '../projects.service.js'
 import type { ProjectRow, CreateProjectInput } from '../types.js'
 
@@ -19,7 +20,7 @@ describe('projects.service', () => {
   })
 
   describe('listProjects', () => {
-    it('returns projects excluding archived by default', async () => {
+    it('returns projects excluding archived and completed by default', async () => {
       const rows: ProjectRow[] = [
         {
           id: 'p1',
@@ -32,18 +33,25 @@ describe('projects.service', () => {
           icon: null,
           created_at: '2025-01-01',
           archived_at: null,
+          completed_at: null,
         },
       ]
       mockQuery.mockResolvedValue({ rows })
       const result = await listProjects(pool)
       expect(result).toEqual(rows)
-      expect(mockQuery.mock.calls[0][0]).toContain('WHERE archived_at IS NULL')
+      expect(mockQuery.mock.calls[0][0]).toContain('WHERE archived_at IS NULL AND completed_at IS NULL')
     })
 
     it('includes archived when includeArchived is true', async () => {
       mockQuery.mockResolvedValue({ rows: [] })
       await listProjects(pool, { includeArchived: true })
       expect(mockQuery.mock.calls[0][0]).not.toContain('WHERE archived_at')
+    })
+
+    it('returns only completed when completedOnly is true', async () => {
+      mockQuery.mockResolvedValue({ rows: [] })
+      await listProjects(pool, { completedOnly: true })
+      expect(mockQuery.mock.calls[0][0]).toContain('WHERE completed_at IS NOT NULL AND archived_at IS NULL')
     })
   })
 
@@ -60,6 +68,7 @@ describe('projects.service', () => {
         icon: null,
         created_at: '2025-01-01',
         archived_at: null,
+        completed_at: null,
       }
       mockQuery.mockResolvedValue({ rows: [row] })
       const result = await getProjectById(pool, 'p1')
@@ -86,6 +95,7 @@ describe('projects.service', () => {
         icon: null,
         created_at: '2025-01-01',
         archived_at: null,
+        completed_at: null,
       }
       mockQuery
         .mockResolvedValueOnce({ rows: [row] })
@@ -122,6 +132,7 @@ describe('projects.service', () => {
         icon: null,
         created_at: '2025-01-01',
         archived_at: null,
+        completed_at: null,
       }
       mockQuery.mockResolvedValue({ rows: [row] })
       const result = await updateProject(pool, 'p1', { name: 'Updated', priority: 'High' })
@@ -140,6 +151,7 @@ describe('projects.service', () => {
         icon: null,
         created_at: '2025-01-01',
         archived_at: null,
+        completed_at: null,
       }
       mockQuery.mockResolvedValue({ rows: [row] })
       const result = await updateProject(pool, 'p1', {})
@@ -164,6 +176,7 @@ describe('projects.service', () => {
         icon: '📁',
         created_at: '2025-01-01',
         archived_at: null,
+        completed_at: null,
       }
       mockQuery.mockResolvedValue({ rows: [row] })
       const result = await updateProject(pool, 'p1', { color: '#22c55e', icon: '📁' })
@@ -190,10 +203,34 @@ describe('projects.service', () => {
         icon: null,
         created_at: '2025-01-01',
         archived_at: '2025-01-02',
+        completed_at: null,
       }
       mockQuery.mockResolvedValue({ rows: [row] })
       const result = await archiveProject(pool, 'p1')
       expect(result).toEqual(row)
+    })
+  })
+
+  describe('completeProject', () => {
+    it('sets completed_at and returns row', async () => {
+      const row: ProjectRow = {
+        id: 'p1',
+        name: 'P1',
+        priority: null,
+        description: null,
+        path: null,
+        project_context: null,
+        color: null,
+        icon: null,
+        created_at: '2025-01-01',
+        archived_at: null,
+        completed_at: '2025-01-02',
+      }
+      mockQuery.mockResolvedValue({ rows: [row] })
+      const result = await completeProject(pool, 'p1')
+      expect(result).toEqual(row)
+      expect(mockQuery.mock.calls[0][0]).toContain('completed_at = now()')
+      expect(mockQuery.mock.calls[0][0]).toContain('completed_at IS NULL')
     })
   })
 })

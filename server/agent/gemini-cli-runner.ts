@@ -12,7 +12,7 @@
 import { spawn } from 'node:child_process'
 import type { StreamChunk, ChatMessage } from './types.js'
 import type { WorkItemToolContext } from './langchain-tools.js'
-import { getGeminiCliPath, getGeminiDefaultModel } from '../config.js'
+import { getGeminiCliPath, getGeminiDefaultModel, getEnvWithNodeInPath } from '../config.js'
 import {
   processContentWithActions,
   messagesToSinglePrompt,
@@ -43,7 +43,7 @@ export async function* runGeminiCLIStream(
   const prompt = messagesToSinglePrompt(messages)
   const model = (options?.model?.trim() || getGeminiDefaultModel()).trim()
   const workspace = options?.workspace
-  const env = { ...process.env, ...options?.env }
+  const env = { ...getEnvWithNodeInPath(), ...options?.env }
 
   const args = ['-p', prompt, '--output-format', 'stream-json', '--model', model]
   const spawnOpts: { env: NodeJS.ProcessEnv; stdio: ('ignore' | 'pipe')[]; shell?: boolean; cwd?: string } = {
@@ -211,7 +211,7 @@ export async function runGeminiCLI(
   const prompt = messagesToSinglePrompt(messages)
   const model = (options?.model?.trim() || getGeminiDefaultModel()).trim()
   const workspace = options?.workspace
-  const env = { ...process.env, ...options?.env }
+  const env = { ...getEnvWithNodeInPath(), ...options?.env }
 
   const args = ['-p', prompt, '--output-format', 'json', '--model', model]
   const { execFile } = await import('node:child_process')

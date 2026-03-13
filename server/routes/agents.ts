@@ -7,6 +7,8 @@ import {
   archiveAgent,
 } from '../services/agents.service.js'
 import { listWorkItemsByAgent } from '../services/work-items.service.js'
+import { cancelPendingItemsForAgent } from '../hook-queue.js'
+import { getCurrentWorkItemId } from '../agent-current-work.js'
 import { fetchOllamaModels } from '../services/ollama.service.js'
 import { fetchCursorModels } from '../services/cursor.service.js'
 import { fetchGeminiModels } from '../services/gemini.service.js'
@@ -24,7 +26,7 @@ import {
 
 export function createAgentsRouter(deps: RouteDeps): Router {
   const router = Router()
-  const { getPool, sse } = deps
+  const { getPool, sse, setCancelRequested } = deps
   const pool = () => getPool()
 
   router.get('/stream-status', (_req, res) => {
@@ -74,6 +76,21 @@ export function createAgentsRouter(deps: RouteDeps): Router {
       if (!agent) throw notFound('Agent not found')
       const rows = await listWorkItemsByAgent(pool(), agentId)
       res.json(rows)
+    })
+  )
+
+  router.post(
+    '/:id/queue/clear',
+    validateParams(paramId),
+    asyncHandler(async (req, res) => {
+      const agentId = req.params.id
+      const agent = await getAgentById(pool(), agentId)
+      if (!agent) throw notFound('Agent not found')
+      // Stop the currently running LangChain stream (handler checks isCancelRequested each chunk)
+      const currentWorkItemId = getCurrentWorkItemId(agentId)
+      if (currentWorkItemId && typeof setCancelRequested === 'function') setCancelRequested(currentWorkItemId)
+      const cleared = await cancelPendingItemsForAgent(pool(), agentId)
+      res.json({ cleared })
     })
   )
 

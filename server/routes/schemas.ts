@@ -44,9 +44,10 @@ export const paramKey = z.object({ key: nonEmptyString })
 /** Params: context file name */
 export const paramName = z.object({ name: z.string() })
 
-/** Query: optional archived=1 */
+/** Query: optional archived=1, completed=1 (projects) */
 export const queryArchived = z.object({
   archived: z.enum(['1']).optional(),
+  completed: z.enum(['1']).optional(),
 })
 
 /** Query: optional status=all for inbox */

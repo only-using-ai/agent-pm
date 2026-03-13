@@ -18,9 +18,14 @@ export async function listProjects(
   pool: Pool,
   options: ListOptions = {}
 ): Promise<ProjectRow[]> {
-  const where = options.includeArchived ? '' : 'WHERE archived_at IS NULL'
+  let where = ''
+  if (options.completedOnly) {
+    where = 'WHERE completed_at IS NOT NULL AND archived_at IS NULL'
+  } else if (!options.includeArchived) {
+    where = 'WHERE archived_at IS NULL AND completed_at IS NULL'
+  }
   const { rows } = await pool.query(
-    `SELECT id, name, priority, description, path, project_context, color, icon, created_at, archived_at FROM projects ${where} ORDER BY created_at DESC`
+    `SELECT id, name, priority, description, path, project_context, color, icon, created_at, archived_at, completed_at FROM projects ${where} ORDER BY created_at DESC`
   )
   return rows as ProjectRow[]
 }
@@ -30,7 +35,7 @@ export async function getProjectById(
   id: string
 ): Promise<ProjectRow | null> {
   const { rows } = await pool.query(
-    'SELECT id, name, priority, description, path, project_context, color, icon, created_at, archived_at FROM projects WHERE id = $1',
+    'SELECT id, name, priority, description, path, project_context, color, icon, created_at, archived_at, completed_at FROM projects WHERE id = $1',
     [id]
   )
   return (rows[0] as ProjectRow) ?? null
@@ -46,7 +51,7 @@ export async function createProject(
   const { rows } = await pool.query(
     `INSERT INTO projects (name, priority, description, path, project_context, color, icon)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at`,
+     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at, completed_at`,
     [input.name, input.priority ?? null, input.description ?? null, input.path ?? null, input.project_context ?? null, input.color ?? null, input.icon ?? null]
   )
   const project = rows[0] as ProjectRow
@@ -99,7 +104,7 @@ export async function updateProject(
   values.push(id)
   const { rows } = await pool.query(
     `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramIndex}
-     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at`,
+     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at, completed_at`,
     values
   )
   return (rows[0] as ProjectRow) ?? null
@@ -111,7 +116,19 @@ export async function archiveProject(
 ): Promise<ProjectRow | null> {
   const { rows } = await pool.query(
     `UPDATE projects SET archived_at = now() WHERE id = $1 AND archived_at IS NULL
-     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at`,
+     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at, completed_at`,
+    [id]
+  )
+  return (rows[0] as ProjectRow) ?? null
+}
+
+export async function completeProject(
+  pool: Pool,
+  id: string
+): Promise<ProjectRow | null> {
+  const { rows } = await pool.query(
+    `UPDATE projects SET completed_at = now() WHERE id = $1 AND archived_at IS NULL AND completed_at IS NULL
+     RETURNING id, name, priority, description, path, project_context, color, icon, created_at, archived_at, completed_at`,
     [id]
   )
   return (rows[0] as ProjectRow) ?? null

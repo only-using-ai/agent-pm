@@ -6,7 +6,7 @@
 
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { getGeminiCliPath } from '../config.js'
+import { getGeminiCliPath, getEnvWithNodeInPath } from '../config.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -27,7 +27,7 @@ export async function fetchGeminiModels(): Promise<GeminiModelsResult> {
     encoding: 'utf8' as const,
     timeout: 10_000,
     maxBuffer: 1024 * 1024,
-    env: { ...process.env },
+    env: getEnvWithNodeInPath(),
   }
   try {
     await execFileAsync(cliPath, ['--version'], execOpts)

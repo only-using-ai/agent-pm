@@ -13,6 +13,7 @@ import type { WorkItemAssignmentChangePayload, WorkItemCancelPayload } from '../
 import type { RouteDeps } from './types.js'
 import { asyncHandler, notFound } from '../errors.js'
 import { validateBody, validateParams, validateQuery } from './validate.js'
+import { cancelPendingItemsForWorkItem } from '../hook-queue.js'
 import {
   queryArchived,
   paramProjectId,
@@ -118,8 +119,10 @@ export function createProjectWorkItemsRouter(deps: RouteDeps): Router {
     '/:id/archive',
     validateParams(paramProjectIdId),
     asyncHandler(async (req, res) => {
-      const row = await archiveWorkItem(pool(), req.params.projectId, req.params.id)
+      const { projectId, id } = req.params
+      const row = await archiveWorkItem(pool(), projectId, id)
       if (!row) throw notFound('Work item not found or already archived')
+      await cancelPendingItemsForWorkItem(pool(), projectId, id)
       res.json(row)
     })
   )

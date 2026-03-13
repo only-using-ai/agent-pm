@@ -48,6 +48,8 @@ export type WorkItemApprovedHandlerDeps = {
   ) => AsyncIterable<AgentStreamChunk>
   isCancelRequested: (workItemId: string) => boolean
   clearCancelRequested: (workItemId: string) => void
+  setCurrentWorkItem: (agentId: string, workItemId: string) => void
+  clearCurrentWorkItem: (agentId: string) => void
   updateWorkItem: (
     pool: Pool,
     projectId: string,
@@ -127,6 +129,8 @@ export function createWorkItemApprovedHandler(
     runAgentStream,
     isCancelRequested,
     clearCancelRequested,
+    setCurrentWorkItem,
+    clearCurrentWorkItem,
     updateWorkItem,
     addWorkItemComment,
     listAgents,
@@ -152,8 +156,9 @@ export function createWorkItemApprovedHandler(
       getWorkItem(pool, payload.project_id, payload.work_item_id),
     ])
 
-    if (!agent || !workItem) return
+    if (!agent || !workItem || workItem.archived_at) return
 
+    setCurrentWorkItem(payload.agent_id, payload.work_item_id)
     try {
       const context = buildContextForWorkItemApproved(agent, workItem as WorkItemRowLike, {
         approvalBody: payload.body,
@@ -208,6 +213,8 @@ export function createWorkItemApprovedHandler(
       broadcaster.broadcastToAgent(payload.agent_id, 'stream_error', {
         message: e instanceof Error ? e.message : String(e),
       })
+    } finally {
+      clearCurrentWorkItem(payload.agent_id)
     }
   }
 }

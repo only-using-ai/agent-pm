@@ -18,6 +18,7 @@ export type AgentStreamChunk =
 export type WorkItemAssignmentChangeHandlerDeps = {
   getPool: () => Pool
   getAgentById: (pool: Pool, id: string) => Promise<AgentRow | null>
+  getWorkItem: (pool: Pool, projectId: string, workItemId: string) => Promise<{ archived_at: string | null } | null>
   getProjectById: (pool: Pool, id: string) => Promise<{ project_context?: string | null } | null>
   getPromptByKey: (pool: Pool, key: string) => Promise<{ content: string } | null>
   /** Contents of the Context tab markdown (.agent-pm/context.md). */
@@ -35,6 +36,8 @@ export type WorkItemAssignmentChangeHandlerDeps = {
   ) => AsyncIterable<AgentStreamChunk>
   isCancelRequested: (workItemId: string) => boolean
   clearCancelRequested: (workItemId: string) => void
+  setCurrentWorkItem: (agentId: string, workItemId: string) => void
+  clearCurrentWorkItem: (agentId: string) => void
   updateWorkItem: (
     pool: Pool,
     projectId: string,
@@ -94,6 +97,7 @@ export function createWorkItemAssignmentChangeHandler(
   const {
     getPool,
     getAgentById,
+    getWorkItem,
     getProjectById,
     getPromptByKey,
     getContextContent,
@@ -102,6 +106,8 @@ export function createWorkItemAssignmentChangeHandler(
     runAgentStream,
     isCancelRequested,
     clearCancelRequested,
+    setCurrentWorkItem,
+    clearCurrentWorkItem,
     updateWorkItem,
     addWorkItemComment,
     listAgents,
@@ -121,11 +127,15 @@ export function createWorkItemAssignmentChangeHandler(
   return async (payload: WorkItemAssignmentChangePayload): Promise<void> => {
     if (!payload.assigned_to) return
 
-    const agentId = payload.assigned_to
     const pool = getPool()
+    const workItem = await getWorkItem(pool, payload.project_id, payload.id)
+    if (!workItem || workItem.archived_at) return
+
+    const agentId = payload.assigned_to
     const agent = await getAgentById(pool, agentId)
     if (!agent) return
 
+    setCurrentWorkItem(agentId, payload.id)
     try {
       const [promptContent, areaContext, project] = await Promise.all([
         getPromptByKey(pool, 'agent_system_prompt'),
@@ -190,6 +200,8 @@ export function createWorkItemAssignmentChangeHandler(
       broadcaster.broadcastToAgent(agentId, 'stream_error', {
         message: e instanceof Error ? e.message : String(e),
       })
+    } finally {
+      clearCurrentWorkItem(agentId)
     }
   }
 }

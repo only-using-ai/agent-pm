@@ -1,6 +1,9 @@
+# Run: docker compose up -d
+# Set in .env so the app uses this DB (otherwise the app uses embedded Postgres on port 54329):
+#   DATABASE_URL=postgres://agentpm:agentpm@localhost:5432/agentpm
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: agent-pm-db
     environment:
       POSTGRES_USER: agentpm
@@ -9,7 +12,6 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - agent-pm-pgdata:/var/lib/postgresql/data
-
-volumes:
-  agent-pm-pgdata:
+      # 18+ expects mount at /var/lib/postgresql with data in versioned subdir (e.g. 18)
+      - ./.agent-pm:/var/lib/postgresql
+      - ./.agent-pm/db:/var/lib/postgresql/18

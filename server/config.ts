@@ -7,7 +7,7 @@
  * @see .env.example for a copy-paste template
  */
 
-import { resolve } from 'node:path'
+import { resolve, dirname, delimiter } from 'node:path'
 
 const DEFAULT_PORT = 38_472
 const DEFAULT_OLLAMA_BASE = 'http://localhost:11434'
@@ -37,6 +37,21 @@ export function getServerPort(): number {
 export function getDatabaseUrl(): string | undefined {
   const url = process.env.DATABASE_URL
   return url?.trim() || undefined
+}
+
+/** Redacted DATABASE_URL for logging (host:port/database). */
+export function getDatabaseUrlForLog(): string {
+  const url = getDatabaseUrl()
+  if (!url) return '(none)'
+  try {
+    const u = new URL(url)
+    const host = u.hostname || 'localhost'
+    const port = u.port || '5432'
+    const db = (u.pathname || '/').replace(/^\//, '') || 'postgres'
+    return `${host}:${port}/${db}`
+  } catch {
+    return '(invalid URL)'
+  }
 }
 
 /**
@@ -127,6 +142,18 @@ export function getCursorDefaultModel(): string {
 export function getGeminiCliPath(): string {
   const envPath = process.env.GEMINI_CLI_PATH?.trim()
   return envPath ?? 'gemini'
+}
+
+/**
+ * Returns process.env with the directory of the current Node executable prepended to PATH.
+ * Use when spawning the Gemini CLI (or other node-shebang scripts) so that "env node" in
+ * their shebang can find node even when the server runs with a minimal PATH (e.g. launchd).
+ */
+export function getEnvWithNodeInPath(): NodeJS.ProcessEnv {
+  const nodeDir = dirname(process.execPath)
+  const pathEnv = process.env.PATH ?? ''
+  if (pathEnv.includes(nodeDir)) return process.env
+  return { ...process.env, PATH: `${nodeDir}${pathEnv ? delimiter + pathEnv : ''}` }
 }
 
 /** Gemini default model for CLI agent runs. Env: GEMINI_MODEL. Aliases: auto, pro, flash, flash-lite. */

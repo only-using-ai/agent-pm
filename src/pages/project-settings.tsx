@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { useQueryClient } from '@tanstack/react-query'
 import { getProject, updateProject, archiveProject } from '@/lib/api'
 import { queryKeys } from '@/lib/query-keys'
+import { useCompleteProjectMutation } from '@/hooks/queries'
 import { useProjects } from '@/contexts/projects-context'
 import { useTheme } from '@/contexts/theme-context'
 import { cn } from '@/lib/utils'
@@ -50,12 +51,15 @@ export function ProjectSettingsPage() {
   const navigate = useNavigate()
   const { refetch } = useProjects()
   const queryClient = useQueryClient()
+  const completeProjectMutation = useCompleteProjectMutation()
   const { effectiveTheme } = useTheme()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [completing, setCompleting] = useState(false)
   const [nameValue, setNameValue] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
@@ -130,6 +134,19 @@ export function ProjectSettingsPage() {
       navigate('/')
     } finally {
       setArchiving(false)
+    }
+  }
+
+  const handleCompleteConfirm = async () => {
+    if (!projectId) return
+    setCompleting(true)
+    try {
+      await completeProjectMutation.mutateAsync(projectId)
+      await refetch()
+      navigate('/')
+    } finally {
+      setCompleting(false)
+      setCompleteDialogOpen(false)
     }
   }
 
@@ -261,7 +278,7 @@ export function ProjectSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Project settings</CardTitle>
-          <CardDescription>Manage this project. Archiving removes it from the sidebar.</CardDescription>
+          <CardDescription>Manage this project. Complete moves it to the Completed section; archiving removes it from the sidebar.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -418,13 +435,28 @@ export function ProjectSettingsPage() {
             </Button>
           </div>
           <div>
+            <h3 className="text-sm font-medium text-muted-foreground">Complete project</h3>
+            <p className="mt-1 text-sm">
+              Mark this project as complete. It will move to the &quot;Completed&quot; section in the sidebar. All data is kept.
+            </p>
+          </div>
+          <div>
             <h3 className="text-sm font-medium text-muted-foreground">Danger zone</h3>
             <p className="mt-1 text-sm">
               Archiving this project will remove it from the sidebar. The project and its data are kept and can be restored later.
             </p>
           </div>
         </CardContent>
-        <CardFooter className="gap-2">
+        <CardFooter className="gap-2 flex-wrap">
+          {!project.completed_at && (
+            <Button
+              variant="secondary"
+              onClick={() => setCompleteDialogOpen(true)}
+              disabled={completing}
+            >
+              Complete project
+            </Button>
+          )}
           <Button
             variant="destructive"
             onClick={() => setArchiveDialogOpen(true)}
@@ -438,6 +470,16 @@ export function ProjectSettingsPage() {
         </CardFooter>
       </Card>
 
+      <ConfirmAlertDialog
+        open={completeDialogOpen}
+        onOpenChange={setCompleteDialogOpen}
+        title="Complete this project?"
+        description="This project will move to the Completed section in the sidebar. All data is kept and you can still open it."
+        confirmLabel="Complete project"
+        cancelLabel="Cancel"
+        variant="default"
+        onConfirm={handleCompleteConfirm}
+      />
       <ConfirmAlertDialog
         open={archiveDialogOpen}
         onOpenChange={setArchiveDialogOpen}

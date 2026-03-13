@@ -16,10 +16,15 @@ export type Project = {
   icon: string | null
   created_at: string
   archived_at?: string | null
+  completed_at?: string | null
 }
 
-export async function listProjects(): Promise<Project[]> {
-  const res = await fetch(`${getApiBase()}/api/projects`)
+export type ListProjectsOptions = { completed?: boolean }
+
+export async function listProjects(options?: ListProjectsOptions): Promise<Project[]> {
+  const url = new URL(`${getApiBase()}/api/projects`)
+  if (options?.completed) url.searchParams.set('completed', '1')
+  const res = await fetch(url.toString())
   if (!res.ok) throw new Error('Failed to list projects')
   return res.json()
 }
@@ -85,6 +90,17 @@ export async function archiveProject(id: string): Promise<Project> {
   return res.json()
 }
 
+export async function completeProject(id: string): Promise<Project> {
+  const res = await fetch(`${getApiBase()}/api/projects/${id}/complete`, {
+    method: 'PATCH',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'Failed to complete project')
+  }
+  return res.json()
+}
+
 export type Agent = {
   id: string
   name: string
@@ -124,6 +140,15 @@ export async function createAgent(body: CreateAgentBody): Promise<Agent> {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Failed to create agent')
   return data as Agent
+}
+
+export async function clearAgentQueue(agentId: string): Promise<{ cleared: number }> {
+  const res = await fetch(`${getApiBase()}/api/agents/${agentId}/queue/clear`, {
+    method: 'POST',
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Failed to clear queue')
+  return data as { cleared: number }
 }
 
 export async function archiveAgent(id: string): Promise<{ id: string; name: string; archived_at: string }> {
@@ -620,6 +645,55 @@ export async function deleteContextFile(name: string): Promise<void> {
   if (!res.ok && res.status !== 204) {
     const err = await res.json().catch(() => ({}))
     throw new Error((err as { error?: string }).error ?? 'Failed to delete file')
+  }
+}
+
+// Database (settings)
+export type DatabaseTableInfo = {
+  table_schema: string
+  table_name: string
+}
+
+export async function listDatabaseTables(): Promise<DatabaseTableInfo[]> {
+  const res = await fetch(`${getApiBase()}/api/database/tables`)
+  if (!res.ok) throw new Error('Failed to list database tables')
+  const data = await res.json()
+  return data.tables ?? []
+}
+
+export async function executeDatabaseQuery(query: string): Promise<{
+  columns: string[]
+  rows: Record<string, unknown>[]
+}> {
+  const res = await fetch(`${getApiBase()}/api/database/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Query failed')
+  return { columns: data.columns ?? [], rows: data.rows ?? [] }
+}
+
+export async function deleteDatabaseRow(
+  tableSchema: string,
+  tableName: string,
+  row: Record<string, unknown>
+): Promise<void> {
+  const res = await fetch(`${getApiBase()}/api/database/delete-row`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      table_schema: tableSchema,
+      table_name: tableName,
+      row,
+    }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(
+      (data as { error?: string }).error ?? 'Failed to delete row'
+    )
   }
 }
 

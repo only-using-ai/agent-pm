@@ -10,6 +10,7 @@ vi.mock('../../services/projects.service.js', () => ({
   createProject: vi.fn(),
   updateProject: vi.fn(),
   archiveProject: vi.fn(),
+  completeProject: vi.fn(),
 }))
 
 import * as projectsService from '../../services/projects.service.js'
@@ -23,18 +24,19 @@ describe('projects routes', () => {
     vi.mocked(projectsService.createProject).mockReset()
     vi.mocked(projectsService.updateProject).mockReset()
     vi.mocked(projectsService.archiveProject).mockReset()
+    vi.mocked(projectsService.completeProject).mockReset()
     pool = createMockPool(vi.fn())
   })
 
   describe('GET /', () => {
     it('returns list of projects', async () => {
-      const rows = [{ id: 'p1', name: 'Project A', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null }]
+      const rows = [{ id: 'p1', name: 'Project A', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null, completed_at: null }]
       vi.mocked(projectsService.listProjects).mockResolvedValue(rows)
       const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
       const app = appWithRouter('/api/projects', router)
       const res = await request(app).get('/api/projects').expect(200)
       expect(res.body).toEqual(rows)
-      expect(projectsService.listProjects).toHaveBeenCalledWith(pool, { includeArchived: false })
+      expect(projectsService.listProjects).toHaveBeenCalledWith(pool, { includeArchived: false, completedOnly: false })
     })
 
     it('includes archived when archived=1', async () => {
@@ -42,13 +44,21 @@ describe('projects routes', () => {
       const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
       const app = appWithRouter('/api/projects', router)
       await request(app).get('/api/projects?archived=1').expect(200)
-      expect(projectsService.listProjects).toHaveBeenCalledWith(pool, { includeArchived: true })
+      expect(projectsService.listProjects).toHaveBeenCalledWith(pool, { includeArchived: true, completedOnly: false })
+    })
+
+    it('returns only completed when completed=1', async () => {
+      vi.mocked(projectsService.listProjects).mockResolvedValue([])
+      const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
+      const app = appWithRouter('/api/projects', router)
+      await request(app).get('/api/projects?completed=1').expect(200)
+      expect(projectsService.listProjects).toHaveBeenCalledWith(pool, { includeArchived: false, completedOnly: true })
     })
   })
 
   describe('GET /:id', () => {
     it('returns project when found', async () => {
-      const row = { id: 'p1', name: 'P', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null }
+      const row = { id: 'p1', name: 'P', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null, completed_at: null }
       vi.mocked(projectsService.getProjectById).mockResolvedValue(row)
       const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
       const app = appWithRouter('/api/projects', router)
@@ -78,7 +88,7 @@ describe('projects routes', () => {
 
   describe('POST /', () => {
     it('creates project and returns 201', async () => {
-      const row = { id: 'p1', name: 'New', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null }
+      const row = { id: 'p1', name: 'New', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null, completed_at: null }
       vi.mocked(projectsService.createProject).mockResolvedValue(row)
       const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
       const app = appWithRouter('/api/projects', router)
@@ -97,7 +107,7 @@ describe('projects routes', () => {
 
   describe('PATCH /:id', () => {
     it('updates project and returns 200', async () => {
-      const row = { id: 'p1', name: 'Updated', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null }
+      const row = { id: 'p1', name: 'Updated', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null, completed_at: null }
       vi.mocked(projectsService.updateProject).mockResolvedValue(row)
       const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
       const app = appWithRouter('/api/projects', router)
@@ -127,7 +137,7 @@ describe('projects routes', () => {
 
   describe('PATCH /:id/archive', () => {
     it('archives project and returns 200', async () => {
-      const row = { id: 'p1', name: 'P', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: '2025-01-02' }
+      const row = { id: 'p1', name: 'P', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: '2025-01-02', completed_at: null }
       vi.mocked(projectsService.archiveProject).mockResolvedValue(row)
       const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
       const app = appWithRouter('/api/projects', router)
@@ -140,6 +150,27 @@ describe('projects routes', () => {
       const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
       const app = appWithRouter('/api/projects', router)
       const res = await request(app).patch('/api/projects/missing/archive')
+      expect(res.status).toBe(404)
+      expect(String(responseBody(res).error ?? (res as { text?: string }).text)).toContain('Project not found')
+    })
+  })
+
+  describe('PATCH /:id/complete', () => {
+    it('completes project and returns 200', async () => {
+      const row = { id: 'p1', name: 'P', priority: null, description: null, path: null, project_context: null, color: null, icon: null, created_at: '2025-01-01', archived_at: null, completed_at: '2025-01-02' }
+      vi.mocked(projectsService.completeProject).mockResolvedValue(row)
+      const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
+      const app = appWithRouter('/api/projects', router)
+      const res = await request(app).patch('/api/projects/p1/complete').expect(200)
+      expect(res.body).toEqual(row)
+      expect(projectsService.completeProject).toHaveBeenCalledWith(pool, 'p1')
+    })
+
+    it('returns 404 when project not found, already completed, or archived', async () => {
+      vi.mocked(projectsService.completeProject).mockResolvedValue(null)
+      const router = createProjectsRouter({ getPool: createMockGetPool(pool) })
+      const app = appWithRouter('/api/projects', router)
+      const res = await request(app).patch('/api/projects/missing/complete')
       expect(res.status).toBe(404)
       expect(String(responseBody(res).error ?? (res as { text?: string }).text)).toContain('Project not found')
     })

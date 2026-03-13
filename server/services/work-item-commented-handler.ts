@@ -37,6 +37,8 @@ export type WorkItemCommentedHandlerDeps = {
   ) => AsyncIterable<AgentStreamChunk>
   isCancelRequested: (workItemId: string) => boolean
   clearCancelRequested: (workItemId: string) => void
+  setCurrentWorkItem: (agentId: string, workItemId: string) => void
+  clearCurrentWorkItem: (agentId: string) => void
   updateWorkItem: (
     pool: Pool,
     projectId: string,
@@ -115,6 +117,8 @@ export function createWorkItemCommentedHandler(
         runAgentStream,
         isCancelRequested,
         clearCancelRequested,
+        setCurrentWorkItem,
+        clearCurrentWorkItem,
         updateWorkItem,
     addWorkItemComment,
     createWorkItem,
@@ -129,7 +133,7 @@ export function createWorkItemCommentedHandler(
   return async (payload: WorkItemCommentedPayload): Promise<void> => {
     const pool = getPool()
     const workItem = await getWorkItem(pool, payload.project_id, payload.work_item_id)
-    if (!workItem) return
+    if (!workItem || workItem.archived_at) return
 
     const agentNamesMap = new Map<string, string>()
     const agentsList = await listAgents(pool)
@@ -156,6 +160,7 @@ export function createWorkItemCommentedHandler(
       const agent = await getAgentById(pool, agentId)
       if (!agent) continue
 
+      setCurrentWorkItem(agentId, payload.work_item_id)
       try {
         const [promptContent, areaContext, project] = await Promise.all([
           getPromptByKey(pool, 'agent_system_prompt'),
@@ -222,6 +227,8 @@ export function createWorkItemCommentedHandler(
         broadcaster.broadcastToAgent(agentId, 'stream_error', {
           message: e instanceof Error ? e.message : String(e),
         })
+      } finally {
+        clearCurrentWorkItem(agentId)
       }
     }
   }

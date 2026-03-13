@@ -418,6 +418,8 @@ export function ProjectPage() {
     filter: '',
     startIndex: 0,
   })
+  /** Index of the highlighted agent in the mention dropdown (for arrow keys + Enter). */
+  const [mentionHighlightIndex, setMentionHighlightIndex] = useState(0)
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null)
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [archiveSubmitting, setArchiveSubmitting] = useState(false)
@@ -760,6 +762,7 @@ export function ProjectPage() {
         return
       }
       setMentionDropdown({ show: true, filter, startIndex: lastAt })
+      setMentionHighlightIndex(0)
     },
     []
   )
@@ -775,15 +778,28 @@ export function ProjectPage() {
         const ta = e.currentTarget
         const start = ta.selectionStart ?? 0
         setMentionDropdown({ show: true, filter: '', startIndex: start })
+        setMentionHighlightIndex(0)
         return
       }
       if (mentionDropdown.show) {
         if (e.key === 'Escape') {
           setMentionDropdown((prev) => ({ ...prev, show: false }))
           e.preventDefault()
+        } else if (e.key === 'ArrowDown' && filteredAgentsForMention.length > 0) {
+          e.preventDefault()
+          setMentionHighlightIndex((i) =>
+            Math.min(i + 1, filteredAgentsForMention.length - 1)
+          )
+        } else if (e.key === 'ArrowUp' && filteredAgentsForMention.length > 0) {
+          e.preventDefault()
+          setMentionHighlightIndex((i) => Math.max(0, i - 1))
         } else if (e.key === 'Enter' && filteredAgentsForMention.length > 0) {
           e.preventDefault()
-          const agent = filteredAgentsForMention[0]
+          const safeIndex = Math.min(
+            mentionHighlightIndex,
+            filteredAgentsForMention.length - 1
+          )
+          const agent = filteredAgentsForMention[safeIndex]
           const ta = e.currentTarget
           const before = newComment.slice(0, mentionDropdown.startIndex)
           const after = newComment.slice(ta.selectionStart ?? 0)
@@ -799,7 +815,7 @@ export function ProjectPage() {
         }
       }
     },
-    [mentionDropdown, newComment, filteredAgentsForMention, submitComment]
+    [mentionDropdown, newComment, filteredAgentsForMention, mentionHighlightIndex, submitComment]
   )
 
   const selectMentionAgent = useCallback(
@@ -1572,17 +1588,30 @@ export function ProjectPage() {
                               No agents match
                             </div>
                           ) : (
-                            filteredAgentsForMention.map((agent) => (
-                              <button
-                                key={agent.id}
-                                type="button"
-                                role="option"
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-muted focus:bg-muted focus:outline-none"
-                                onClick={() => selectMentionAgent(agent)}
-                              >
-                                {agent.name}
-                              </button>
-                            ))
+                            filteredAgentsForMention.map((agent, index) => {
+                              const safeHighlightIndex = Math.min(
+                                mentionHighlightIndex,
+                                filteredAgentsForMention.length - 1
+                              )
+                              const isHighlighted = index === safeHighlightIndex
+                              return (
+                                <button
+                                  key={agent.id}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={isHighlighted}
+                                  className={cn(
+                                    'w-full text-left px-3 py-2 text-sm focus:outline-none',
+                                    isHighlighted
+                                      ? 'bg-primary/15 text-primary'
+                                      : 'hover:bg-muted'
+                                  )}
+                                  onClick={() => selectMentionAgent(agent)}
+                                >
+                                  {agent.name}
+                                </button>
+                              )
+                            })
                           )}
                         </div>
                       )}

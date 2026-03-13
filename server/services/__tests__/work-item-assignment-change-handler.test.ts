@@ -38,6 +38,9 @@ describe('work-item-assignment-change-handler', () => {
   let mockGetInitialMessages: ReturnType<typeof vi.fn>
   let mockRunAgentStream: ReturnType<typeof vi.fn>
   let mockBroadcaster: { broadcastToAgent: ReturnType<typeof vi.fn> }
+  const mockGetWorkItem = vi.fn().mockResolvedValue({ archived_at: null })
+  const mockSetCurrentWorkItem = vi.fn()
+  const mockClearCurrentWorkItem = vi.fn()
 
   beforeEach(() => {
     mockGetPool = vi.fn(() => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }))
@@ -57,6 +60,7 @@ describe('work-item-assignment-change-handler', () => {
     const handler = createWorkItemAssignmentChangeHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -65,6 +69,8 @@ describe('work-item-assignment-change-handler', () => {
       runAgentStream: mockRunAgentStream,
       isCancelRequested: vi.fn().mockReturnValue(false),
       clearCancelRequested: vi.fn(),
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: vi.fn().mockResolvedValue(null),
       addWorkItemComment: vi.fn().mockResolvedValue(null),
       listAgents: vi.fn().mockResolvedValue([]),
@@ -82,6 +88,7 @@ describe('work-item-assignment-change-handler', () => {
     const handler = createWorkItemAssignmentChangeHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -90,6 +97,8 @@ describe('work-item-assignment-change-handler', () => {
       runAgentStream: mockRunAgentStream,
       isCancelRequested: vi.fn().mockReturnValue(false),
       clearCancelRequested: vi.fn(),
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: vi.fn().mockResolvedValue(null),
       addWorkItemComment: vi.fn().mockResolvedValue(null),
       listAgents: vi.fn().mockResolvedValue([]),
@@ -105,6 +114,7 @@ describe('work-item-assignment-change-handler', () => {
     const handler = createWorkItemAssignmentChangeHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -113,6 +123,8 @@ describe('work-item-assignment-change-handler', () => {
       runAgentStream: mockRunAgentStream,
       isCancelRequested: vi.fn().mockReturnValue(false),
       clearCancelRequested: vi.fn(),
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: vi.fn().mockResolvedValue(null),
       addWorkItemComment: vi.fn().mockResolvedValue(null),
       listAgents: vi.fn().mockResolvedValue([]),

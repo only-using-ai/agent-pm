@@ -6,6 +6,7 @@ export const queryKeys = {
   all: ['agent-pm'] as const,
   projects: {
     all: () => [...queryKeys.all, 'projects'] as const,
+    completed: () => [...queryKeys.all, 'projects', 'completed'] as const,
     detail: (id: string) => [...queryKeys.projects.all(), id] as const,
   },
   agents: {

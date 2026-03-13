@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Circle, ListTodo } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -36,7 +36,7 @@ import { useAgentStream } from '@/contexts/agent-stream-context'
 import { useTeams } from '@/contexts/teams-context'
 import { useProviderModels } from '@/hooks/use-provider-models'
 import { useArchiveAgentMutation } from '@/hooks/queries'
-import { getApiBase } from '@/lib/api'
+import { getApiBase, clearAgentQueue } from '@/lib/api'
 import { AI_PROVIDERS } from '@/lib/ai-providers'
 
 export function AgentPage() {
@@ -81,6 +81,7 @@ export function AgentPage() {
   }
   const [queueWorkItems, setQueueWorkItems] = useState<QueueItem[]>([])
   const [queueLoading, setQueueLoading] = useState(false)
+  const [queueClearing, setQueueClearing] = useState(false)
 
   const { models: providerModels, loading: modelsLoading, error: modelsError } = useProviderModels(aiProvider)
 
@@ -133,27 +134,21 @@ export function AgentPage() {
     return subscribeToStream(agentId)
   }, [agentId, subscribeToStream])
 
-  // Fetch work items queued for this agent
-  useEffect(() => {
+  const loadQueue = useCallback(() => {
     if (!agentId) return
-    let cancelled = false
     setQueueLoading(true)
     setQueueWorkItems([])
     fetch(`${getApiBase()}/api/agents/${agentId}/work-items`)
       .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        if (!cancelled) setQueueWorkItems(Array.isArray(data) ? data : [])
-      })
-      .catch(() => {
-        if (!cancelled) setQueueWorkItems([])
-      })
-      .finally(() => {
-        if (!cancelled) setQueueLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
+      .then((data) => setQueueWorkItems(Array.isArray(data) ? data : []))
+      .catch(() => setQueueWorkItems([]))
+      .finally(() => setQueueLoading(false))
   }, [agentId])
+
+  useEffect(() => {
+    if (!agentId) return
+    loadQueue()
+  }, [agentId, loadQueue])
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId)
   const isStreaming = agentId ? streamingAgentIds.has(agentId) : false
@@ -213,6 +208,18 @@ export function AgentPage() {
     if (!agentId) return
     await archiveAgent.mutateAsync(agentId)
     navigate('/')
+  }
+
+  const handleEmptyQueue = async () => {
+    if (!agentId) return
+    setQueueClearing(true)
+    try {
+      await clearAgentQueue(agentId)
+      clearStream(agentId)
+      loadQueue()
+    } finally {
+      setQueueClearing(false)
+    }
   }
 
   const hasAgent = agent ?? loadedAgent
@@ -454,10 +461,21 @@ export function AgentPage() {
           {queueWorkItems.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ListTodo className="size-4" />
-                  Queue
-                </CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ListTodo className="size-4" />
+                    Queue
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEmptyQueue}
+                    disabled={queueClearing}
+                  >
+                    {queueClearing ? 'Clearing…' : 'Empty queue'}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="pt-0">
                 {queueLoading ? (

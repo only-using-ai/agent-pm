@@ -46,6 +46,7 @@ export type ProjectRow = {
   icon: string | null
   created_at: string
   archived_at: string | null
+  completed_at: string | null
 }
 
 export type CreateProjectInput = {
@@ -182,7 +183,7 @@ export type UpdateAssetInput = Partial<{
   url: string | null
 }>
 
-export type ListOptions = { includeArchived?: boolean }
+export type ListOptions = { includeArchived?: boolean; completedOnly?: boolean }
 
 export type ApprovalRequestRow = {
   id: string

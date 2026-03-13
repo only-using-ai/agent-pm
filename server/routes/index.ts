@@ -11,6 +11,7 @@ import { createContextRouter } from './context.js'
 import { createProfileRouter } from './profile.js'
 import { createPromptsRouter } from './prompts.js'
 import { createProjectFilesRouter } from './project-files.js'
+import { createDatabaseRouter } from './database.js'
 import type { RouteDeps } from './types.js'
 
 /**
@@ -32,4 +33,5 @@ export function mountRoutes(app: Express, deps: RouteDeps): void {
   app.use('/api/prompts', createPromptsRouter(deps))
   app.use('/api/projects/:projectId/files', createProjectFilesRouter(deps))
   app.use('/api/projects/:projectId/assets', createAssetsRouter(deps))
+  app.use('/api/database', createDatabaseRouter(deps))
 }

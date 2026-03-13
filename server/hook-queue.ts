@@ -85,6 +85,46 @@ async function markCompleted(pool: Pool, id: string): Promise<void> {
 }
 
 /**
+ * Cancel pending hook queue items for a work item (e.g. after archive).
+ * Marks them as completed so they are not processed.
+ */
+export async function cancelPendingItemsForWorkItem(
+  pool: Pool,
+  projectId: string,
+  workItemId: string
+): Promise<number> {
+  const result = await pool.query(
+    `UPDATE hook_queue SET status = 'completed', processed_at = now()
+     WHERE status = 'pending' AND (
+       (event = 'work_item.created' AND (payload->>'id') = $1 AND (payload->>'project_id') = $2) OR
+       (event = 'work_item.commented' AND (payload->>'work_item_id') = $1 AND (payload->>'project_id') = $2) OR
+       (event = 'work_item.assignment_change' AND (payload->>'id') = $1 AND (payload->>'project_id') = $2) OR
+       (event = 'work_item.approved' AND (payload->>'work_item_id') = $1 AND (payload->>'project_id') = $2)
+     )`,
+    [workItemId, projectId]
+  )
+  return (result as { rowCount?: number })?.rowCount ?? 0
+}
+
+/**
+ * Cancel pending hook queue items for an agent (e.g. "empty queue" from agent page).
+ * Marks them as completed so they are not processed.
+ */
+export async function cancelPendingItemsForAgent(pool: Pool, agentId: string): Promise<number> {
+  const result = await pool.query(
+    `UPDATE hook_queue SET status = 'completed', processed_at = now()
+     WHERE status = 'pending' AND (
+       (event = 'work_item.created' AND (payload->>'assigned_to') = $1) OR
+       (event = 'work_item.commented' AND (payload->'mentioned_agent_ids') @> to_jsonb($1::text)) OR
+       (event = 'work_item.assignment_change' AND (payload->>'assigned_to') = $1) OR
+       (event = 'work_item.approved' AND (payload->>'agent_id') = $1)
+     )`,
+    [agentId]
+  )
+  return (result as { rowCount?: number })?.rowCount ?? 0
+}
+
+/**
  * Mark an item as failed. If retry_count < MAX_RETRIES, set back to pending.
  */
 async function markFailed(

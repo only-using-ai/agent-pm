@@ -54,6 +54,9 @@ describe('work-item-created-handler (LangChain)', () => {
   let mockBroadcaster: { broadcastToAgent: ReturnType<typeof vi.fn> }
   const mockIsCancelRequested = vi.fn().mockReturnValue(false)
   const mockClearCancelRequested = vi.fn()
+  const mockGetWorkItem = vi.fn().mockResolvedValue({ archived_at: null })
+  const mockSetCurrentWorkItem = vi.fn()
+  const mockClearCurrentWorkItem = vi.fn()
 
   beforeEach(() => {
     mockGetPool = vi.fn(() => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }))
@@ -79,6 +82,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -87,6 +91,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,
@@ -130,6 +136,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -138,6 +145,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,
@@ -161,6 +170,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -169,6 +179,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,
@@ -187,6 +199,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -195,6 +208,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,
@@ -212,6 +227,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -220,6 +236,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,
@@ -241,6 +259,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -249,6 +268,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream: mockRunAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,
@@ -270,6 +291,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -278,6 +300,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream: mockRunAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,
@@ -306,6 +330,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -314,6 +339,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream: mockRunAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,
@@ -337,6 +364,7 @@ describe('work-item-created-handler (LangChain)', () => {
     const handler = createWorkItemCreatedHandler({
       getPool: mockGetPool,
       getAgentById: mockGetAgentById,
+      getWorkItem: mockGetWorkItem,
       getProjectById: mockGetProjectById,
       getPromptByKey: mockGetPromptByKey,
       getContextContent: mockGetContextContent,
@@ -345,6 +373,8 @@ describe('work-item-created-handler (LangChain)', () => {
       runAgentStream: mockRunAgentStream,
       isCancelRequested: mockIsCancelRequested,
       clearCancelRequested: mockClearCancelRequested,
+      setCurrentWorkItem: mockSetCurrentWorkItem,
+      clearCurrentWorkItem: mockClearCurrentWorkItem,
       updateWorkItem: mockUpdateWorkItem,
       addWorkItemComment: mockAddWorkItemComment,
       listAgents: mockListAgents,

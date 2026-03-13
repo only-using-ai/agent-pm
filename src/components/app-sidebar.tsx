@@ -42,7 +42,7 @@ export function AppSidebar() {
   const location = useLocation()
   const { agents } = useAgents()
   const { streamingAgentIds, agentActions } = useAgentStream()
-  const { projects, loading } = useProjects()
+  const { projects, completedProjects, loading } = useProjects()
   const { tools: mcpTools, loading: mcpLoading } = useMcp()
   const { count: inboxCount } = useInbox()
   const streamingAgents = agents.filter((a) => streamingAgentIds.has(a.id))
@@ -193,6 +193,63 @@ export function AppSidebar() {
                             </div>
                           </SidebarMenuSubItem>
                         ))}
+                      {completedProjects.length > 0 && (
+                        <SidebarMenuSubItem>
+                          <Collapsible defaultOpen={false} className="group/completed">
+                            <CollapsibleTrigger
+                              className={cn(
+                                menuButtonClass,
+                                'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground'
+                              )}
+                            >
+                              <span className="truncate">Completed</span>
+                              <ChevronDown className="ml-auto size-4 shrink-0 transition-transform group-data-[state=open]/completed:rotate-180" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <SidebarMenuSub className="ml-2 border-l border-sidebar-border pl-2">
+                                {completedProjects.map((project) => (
+                                  <SidebarMenuSubItem key={project.id}>
+                                    <div className="flex w-full items-center gap-0 group/row">
+                                      <SidebarMenuSubButton
+                                        render={<Link to={`/projects/${project.id}`} />}
+                                        className="flex-1 min-w-0"
+                                      >
+                                        <span className="flex items-center gap-2 min-w-0">
+                                          {project.color && (
+                                            <span
+                                              className="size-2.5 shrink-0 rounded-[4px]"
+                                              style={{ backgroundColor: project.color }}
+                                              aria-hidden
+                                            />
+                                          )}
+                                          {project.icon && (
+                                            <span className="shrink-0 text-base leading-none" aria-hidden>
+                                              {project.icon}
+                                            </span>
+                                          )}
+                                          <span className="truncate">{project.name}</span>
+                                        </span>
+                                      </SidebarMenuSubButton>
+                                      <Link
+                                        to={`/projects/${project.id}/settings`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={cn(
+                                          'shrink-0 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity',
+                                          'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                                          'group-hover/row:opacity-100 focus:opacity-100 focus:outline-none'
+                                        )}
+                                        aria-label="Project settings"
+                                      >
+                                        <Settings className="size-4" />
+                                      </Link>
+                                    </div>
+                                  </SidebarMenuSubItem>
+                                ))}
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </SidebarMenuSubItem>
+                      )}
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton
                           render={<Link to="/projects/new" />}

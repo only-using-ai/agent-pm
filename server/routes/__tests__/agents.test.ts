@@ -38,7 +38,12 @@ vi.mock('../../services/work-items.service.js', () => ({
   listWorkItemsByAgent: vi.fn(),
 }))
 
+vi.mock('../../hook-queue.js', () => ({
+  cancelPendingItemsForAgent: vi.fn(),
+}))
+
 import * as agentsService from '../../services/agents.service.js'
+import * as hookQueue from '../../hook-queue.js'
 import * as workItemsService from '../../services/work-items.service.js'
 import * as ollamaService from '../../services/ollama.service.js'
 import * as cursorService from '../../services/cursor.service.js'
@@ -56,6 +61,7 @@ describe('agents routes', () => {
     vi.mocked(agentsService.updateAgent).mockReset()
     vi.mocked(agentsService.archiveAgent).mockReset()
     vi.mocked(workItemsService.listWorkItemsByAgent).mockReset()
+    vi.mocked(hookQueue.cancelPendingItemsForAgent).mockReset()
     mockQuery = vi.fn()
     pool = createMockPool(mockQuery)
   })
@@ -332,6 +338,47 @@ describe('agents routes', () => {
       const res = await request(app).get('/api/agents/missing/work-items')
       expect(res.status).toBe(404)
       expect(workItemsService.listWorkItemsByAgent).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('POST /:id/queue/clear', () => {
+    it('clears pending queue items and returns cleared count', async () => {
+      const agentRow = {
+        id: 'a1',
+        name: 'Dev Agent',
+        team_id: 't1',
+        instructions: null,
+        ai_provider: 'ollama',
+        model: null,
+        created_at: '2025-01-01',
+        archived_at: null,
+      }
+      vi.mocked(agentsService.getAgentById).mockResolvedValue(agentRow)
+      vi.mocked(hookQueue.cancelPendingItemsForAgent).mockResolvedValue(2)
+      const router = createAgentsRouter({
+        getPool: createMockGetPool(pool),
+        sse: createMockSse(),
+        emit: () => {},
+        upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() },
+      })
+      const app = appWithRouter('/api/agents', router)
+      const res = await request(app).post('/api/agents/a1/queue/clear').expect(200)
+      expect(res.body).toEqual({ cleared: 2 })
+      expect(agentsService.getAgentById).toHaveBeenCalledWith(pool, 'a1')
+      expect(hookQueue.cancelPendingItemsForAgent).toHaveBeenCalledWith(pool, 'a1')
+    })
+
+    it('returns 404 when agent not found', async () => {
+      vi.mocked(agentsService.getAgentById).mockResolvedValue(null)
+      const router = createAgentsRouter({
+        getPool: createMockGetPool(pool),
+        sse: createMockSse(),
+        emit: () => {},
+        upload: { single: () => (_req: unknown, _res: unknown, next: () => void) => next() },
+      })
+      const app = appWithRouter('/api/agents', router)
+      await request(app).post('/api/agents/missing/queue/clear').expect(404)
+      expect(hookQueue.cancelPendingItemsForAgent).not.toHaveBeenCalled()
     })
   })
 

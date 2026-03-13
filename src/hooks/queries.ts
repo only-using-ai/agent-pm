@@ -19,7 +19,17 @@ export function useProjectsQuery(
 ) {
   return useQuery({
     queryKey: queryKeys.projects.all(),
-    queryFn: api.listProjects,
+    queryFn: () => api.listProjects(),
+    ...options,
+  })
+}
+
+export function useCompletedProjectsQuery(
+  options?: Omit<UseQueryOptions<api.Project[]>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: queryKeys.projects.completed(),
+    queryFn: () => api.listProjects({ completed: true }),
     ...options,
   })
 }
@@ -71,6 +81,22 @@ export function useArchiveProjectMutation(
     mutationFn: api.archiveProject,
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: queryKeys.projects.all() })
+      void qc.invalidateQueries({ queryKey: queryKeys.projects.completed() })
+      void qc.invalidateQueries({ queryKey: queryKeys.projects.detail(data.id) })
+    },
+    ...opts,
+  })
+}
+
+export function useCompleteProjectMutation(
+  opts?: UseMutationOptions<api.Project, Error, string>
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.completeProject,
+    onSuccess: (data) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.projects.all() })
+      void qc.invalidateQueries({ queryKey: queryKeys.projects.completed() })
       void qc.invalidateQueries({ queryKey: queryKeys.projects.detail(data.id) })
     },
     ...opts,

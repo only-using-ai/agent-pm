@@ -45,6 +45,7 @@ import type { AgentStreamChunk } from './services/work-item-created-handler.js'
 import { getServerPort, getDatabaseUrl } from './config.js'
 import { errorMiddleware } from './errors.js'
 import { setCancelRequested, isCancelRequested, clearCancelRequested } from './cancel-work-item.js'
+import { setCurrentWorkItem, clearCurrentWorkItem } from './agent-current-work.js'
 import { mountRoutes } from './routes/index.js'
 
 const app = express()
@@ -79,6 +80,7 @@ const runAgentStream = buildRunAgentStream()
 const commonHandlerDeps = {
   getPool: pool,
   getAgentById,
+  getWorkItem,
   getPromptByKey,
   getContextContent,
   getInitialMessages: (agent: unknown, context: unknown) =>
@@ -86,6 +88,8 @@ const commonHandlerDeps = {
   runAgentStream,
   isCancelRequested,
   clearCancelRequested,
+  setCurrentWorkItem,
+  clearCurrentWorkItem,
   updateWorkItem: (p, projectId, workItemId, input) =>
     updateWorkItemService(p, projectId, workItemId, input as Parameters<typeof updateWorkItemService>[3]),
   addWorkItemComment: (p, projectId, workItemId, body, options) =>
@@ -171,14 +175,23 @@ async function start() {
   const connectionString = getDatabaseUrl()
 
   if (connectionString) {
-    console.log('Using external PostgreSQL (DATABASE_URL)')
+    const { getDatabaseUrlForLog } = await import('./config.js')
+    console.log('Using external PostgreSQL:', getDatabaseUrlForLog())
     const p = createPool(connectionString)
     const maxAttempts = 30
     const delayMs = 1000
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await initDb(p)
-        console.log('Database tables ready')
+        const client = await p.connect()
+        const { rows } = await client
+          .query('SELECT current_database() AS db, inet_server_port() AS port')
+          .finally(() => client.release())
+        const r = rows[0]
+        console.log(
+          'Database tables ready at',
+          r ? `${r.port}/${r.db}` : getDatabaseUrlForLog()
+        )
         break
       } catch (e) {
         if (attempt === maxAttempts) {
@@ -190,6 +203,7 @@ async function start() {
       }
     }
   } else {
+    console.log('Using embedded PostgreSQL (DATABASE_URL not set)')
     await startEmbeddedPostgres()
   }
 

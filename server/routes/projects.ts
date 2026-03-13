@@ -5,6 +5,7 @@ import {
   createProject,
   updateProject,
   archiveProject,
+  completeProject,
 } from '../services/projects.service.js'
 import type { UpdateProjectInput } from '../services/types.js'
 import type { RouteDeps } from './types.js'
@@ -17,12 +18,13 @@ import {
   queryArchived,
 } from './schemas.js'
 
-/** Ensure API response always includes color and icon (for clients that expect them). */
+/** Ensure API response always includes color, icon, completed_at (for clients that expect them). */
 function toProjectResponse(row: Record<string, unknown>): Record<string, unknown> {
   return {
     ...row,
     color: row.color ?? null,
     icon: row.icon ?? null,
+    completed_at: row.completed_at ?? null,
   }
 }
 
@@ -35,7 +37,8 @@ export function createProjectsRouter(deps: Pick<RouteDeps, 'getPool'>): Router {
     validateQuery(queryArchived),
     asyncHandler(async (req, res) => {
       const includeArchived = req.query.archived === '1'
-      const rows = await listProjects(pool(), { includeArchived })
+      const completedOnly = req.query.completed === '1'
+      const rows = await listProjects(pool(), { includeArchived, completedOnly })
       res.json(rows.map((r) => toProjectResponse(r as Record<string, unknown>)))
     })
   )
@@ -86,6 +89,16 @@ export function createProjectsRouter(deps: Pick<RouteDeps, 'getPool'>): Router {
     asyncHandler(async (req, res) => {
       const row = await archiveProject(pool(), req.params.id)
       if (!row) throw notFound('Project not found or already archived')
+      res.json(toProjectResponse(row as Record<string, unknown>))
+    })
+  )
+
+  router.patch(
+    '/:id/complete',
+    validateParams(paramId),
+    asyncHandler(async (req, res) => {
+      const row = await completeProject(pool(), req.params.id)
+      if (!row) throw notFound('Project not found, already completed, or archived')
       res.json(toProjectResponse(row as Record<string, unknown>))
     })
   )
